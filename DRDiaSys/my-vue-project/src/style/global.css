@@ -1,0 +1,8 @@
+/* src/styles/global.css */
+html, body, #app {
+    margin: 0;
+    padding: 0;
+    height: 100%; /* 確保 html, body, 和 Vue 根元素高度為 100% */
+    overflow: hidden; /* 防止全局滾動條出現，滾動條應在 el-main 內部 */
+  }
+  
