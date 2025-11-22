@@ -10,8 +10,8 @@ class UsersConfig(AppConfig):
         # 導入信號處理器
         import users.signals
         
-        # 確保系統用戶組存在
+        #確保系統用戶組存在
         from django.contrib.auth.models import Group
         required_groups = ['admin', 'doctor', 'patient']
         for group_name in required_groups:
-            Group.objects.get_or_create(name=group_name)
+           Group.objects.get_or_create(name=group_name)

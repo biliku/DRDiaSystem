@@ -54,7 +54,7 @@ def setup_logger():
     logging.basicConfig(
         level=logging.INFO, 
         format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[logging.FileHandler(log_file), logging.StreamHandler()]
+        handlers=[logging.FileHandler(log_file, encoding='utf-8'), logging.StreamHandler()]
     )
     return logging.getLogger(__name__)
 
