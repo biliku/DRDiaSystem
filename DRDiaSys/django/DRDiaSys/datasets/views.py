@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from django.core.exceptions import ObjectDoesNotExist
 
 # 数据集存储路径
-DATASET_ROOT = 'F:/DRDiaSys/django/DRDiaSys/datasets/dataset'
+DATASET_ROOT = 'F:/DRDiaSys/DRDiaSys/django/DRDiaSys/datasets/dataset'
 
 def normalize_path(path):
     """标准化路径"""

@@ -523,7 +523,7 @@ const fetchDatasetList = async () => {
     tableLoading.value = true
     const response = await axios.get('http://localhost:8000/api/datasets/list_local/', {
       params: {
-        base_path: '/f:/DRDiaSys/django/DRDiaSys/datasets/dataset'
+        base_path: 'F:/DRDiaSys/DRDiaSys/django/DRDiaSys/datasets/dataset'
       }
     })
 
@@ -669,7 +669,7 @@ const submitDataset = async () => {
   if (!datasetFormRef.value) return;
   try {
     await datasetFormRef.value.validate();
-    const basePathForAPI = '/f:/DRDiaSys/django/DRDiaSys/datasets/dataset';
+    const basePathForAPI = 'F:/DRDiaSys/DRDiaSys/django/DRDiaSys/datasets/dataset';
     let response;
 
     const payload = {
@@ -725,7 +725,7 @@ const fetchPreviewData = async () => {
   try {
     const response = await axios.get(`http://localhost:8000/api/datasets/${currentDataset.value.id}/preview/`, {
       params: {
-        base_path: '/f:/DRDiaSys/django/DRDiaSys/datasets/dataset',
+        base_path: 'F:/DRDiaSys/DRDiaSys/django/DRDiaSys/datasets/dataset',
         dir: currentDir.value,
         page: previewPage.value,
         page_size: previewPageSize.value
@@ -849,7 +849,7 @@ const handleDelete = async (row) => {
       { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' }
     )
     const response = await axios.delete(`http://localhost:8000/api/datasets/${row.id}/`, {
-      params: { base_path: '/f:/DRDiaSys/django/DRDiaSys/datasets/dataset' }
+      params: { base_path: 'F:/DRDiaSys/DRDiaSys/django/DRDiaSys/datasets/dataset' }
     })
     if (response.status === 204) {
       ElMessage.success('删除成功')

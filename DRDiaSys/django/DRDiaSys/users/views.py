@@ -11,6 +11,8 @@ from django.contrib.auth.hashers import make_password
 from django.db.models import Count
 from rest_framework.pagination import PageNumberPagination
 from django.db import models
+from .models import PatientInfo, ConditionInfo
+from .serializers import PatientInfoSerializer, ConditionInfoSerializer
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -395,3 +397,124 @@ def fix_admin_permissions(request):
         'message': f'成功修復 {fixed_count} 個管理員用戶的權限',
         'fixed_users': [user.username for user in admin_users if user.is_staff]
     })
+
+
+# ==================== 患者信息录入相关API ====================
+
+@api_view(['GET', 'POST', 'PUT'])
+@permission_classes([IsAuthenticated])
+def patient_info(request):
+    """获取或创建/更新患者个人信息"""
+    user = request.user
+    
+    # 检查用户角色
+    if not hasattr(user, 'profile') or user.profile.role != 'patient':
+        return Response(
+            {'message': '只有患者可以访问此功能'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    if request.method == 'GET':
+        # 获取患者信息
+        try:
+            patient_info = PatientInfo.objects.get(user=user)
+            serializer = PatientInfoSerializer(patient_info)
+            return Response(serializer.data)
+        except PatientInfo.DoesNotExist:
+            return Response({'message': '尚未填写个人信息'}, status=status.HTTP_404_NOT_FOUND)
+    
+    elif request.method == 'POST':
+        # 创建患者信息
+        if PatientInfo.objects.filter(user=user).exists():
+            return Response(
+                {'message': '个人信息已存在，请使用PUT方法更新'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = PatientInfoSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'PUT':
+        # 更新患者信息
+        try:
+            patient_info = PatientInfo.objects.get(user=user)
+            serializer = PatientInfoSerializer(patient_info, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except PatientInfo.DoesNotExist:
+            # 如果不存在，则创建
+            serializer = PatientInfoSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save(user=user)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def condition_info_list(request):
+    """获取病情信息列表或创建新的病情信息"""
+    user = request.user
+    
+    # 检查用户角色
+    if not hasattr(user, 'profile') or user.profile.role != 'patient':
+        return Response(
+            {'message': '只有患者可以访问此功能'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    if request.method == 'GET':
+        # 获取该患者的所有病情信息
+        conditions = ConditionInfo.objects.filter(user=user).order_by('-created_at')
+        serializer = ConditionInfoSerializer(conditions, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        # 创建新的病情信息
+        serializer = ConditionInfoSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def condition_info_detail(request, condition_id):
+    """获取、更新或删除特定的病情信息"""
+    user = request.user
+    
+    # 检查用户角色
+    if not hasattr(user, 'profile') or user.profile.role != 'patient':
+        return Response(
+            {'message': '只有患者可以访问此功能'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    try:
+        condition = ConditionInfo.objects.get(id=condition_id, user=user)
+    except ConditionInfo.DoesNotExist:
+        return Response(
+            {'message': '病情信息不存在'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    if request.method == 'GET':
+        serializer = ConditionInfoSerializer(condition)
+        return Response(serializer.data)
+    
+    elif request.method == 'PUT':
+        serializer = ConditionInfoSerializer(condition, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        condition.delete()
+        return Response({'message': '病情信息已删除'}, status=status.HTTP_204_NO_CONTENT)

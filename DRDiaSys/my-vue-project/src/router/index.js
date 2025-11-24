@@ -5,6 +5,8 @@ import UserManagement from '../views/modules/UserManagement.vue'
 import DataManagement from '../views/modules/DataManagement.vue'
 import ImageProcessing from '../views/modules/ImageProcessing.vue'
 import Dashboard from '../views/modules/Dashboard.vue'
+import PersonalInfo from '../views/modules/PersonalInfo.vue'
+import ConditionInfo from '../views/modules/ConditionInfo.vue'
 
 const routes = [
   {
@@ -40,6 +42,16 @@ const routes = [
         path: '/dashboard',
         name: 'Dashboard',
         component: Dashboard
+      },
+      {
+        path: '/personal-info',
+        name: 'PersonalInfo',
+        component: PersonalInfo
+      },
+      {
+        path: '/condition-info',
+        name: 'ConditionInfo',
+        component: ConditionInfo
       }
       // 其他子路由可以在这里添加
     ]
@@ -53,9 +65,15 @@ const router = createRouter({
 
 // 全局前置守卫
 router.beforeEach((to, from, next) => {
-  // 如果是登录页面，直接通过
+  // 如果是登录页面，直接通过（不检查token）
   if (to.path === '/login') {
-    next()
+    // 如果已经登录，跳转到首页
+    const token = localStorage.getItem('token')
+    if (token) {
+      next('/dashboard')
+    } else {
+      next()
+    }
     return
   }
   

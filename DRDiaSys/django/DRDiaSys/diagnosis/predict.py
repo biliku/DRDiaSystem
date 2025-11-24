@@ -31,8 +31,8 @@ LESION_MAP = OrderedDict([
 NUM_CLASSES = len(LESION_MAP) + 1
 
 # 路径配置
-MODEL_PATH = r"django\DRDiaSys\diagnosis\best_lesion_segmentation_model_v4.pth"
-NEW_DATASET_DIR = r"F:\DRDiaSys\django\DRDiaSys\datasets\dataset\aptos2019_preprocessed\test_images_processed"  # 新数据集路径
+MODEL_PATH = r"F:\DRDiaSys\DRDiaSys\django\DRDiaSys\diagnosis\best_lesion_segmentation_model_v4.pth"
+NEW_DATASET_DIR = r"F:\DRDiaSys\DRDiaSys\django\DRDiaSys\datasets\dataset\aptos2019_preprocessed\test_images_processed"  # 新数据集路径
 RESULT_DIR = "prediction_results"  # 结果保存目录
 
 # =================================================================================
