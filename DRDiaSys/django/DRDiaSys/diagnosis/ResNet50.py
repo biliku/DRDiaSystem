@@ -31,7 +31,8 @@ NUM_EPOCHS = 15  # 大幅减少epoch
 LEARNING_RATE = 1e-5  # 显著降低学习率
 NUM_CLASSES = 5
 MODEL_SAVE_PATH = "best_resnet_aptos_improved.pth"
-DATA_ROOT = 'F:\\DRDiaSys\\django\\DRDiaSys\\datasets\\dataset\\aptos2019_preprocessed'
+# use raw string to avoid escape sequences like \a being interpreted
+DATA_ROOT = r'F:\DRDiaSys\DRDiaSys\django\DRDiaSys\datasets\dataset\aptos2019_preprocessed'
 TRAIN_CSV_PATH = os.path.join(DATA_ROOT, 'train.csv')
 VAL_CSV_PATH = os.path.join(DATA_ROOT, 'valid.csv')
 TEST_CSV_PATH = os.path.join(DATA_ROOT, 'test.csv')

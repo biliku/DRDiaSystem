@@ -2,11 +2,13 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
 import Layout from '../views/Layout.vue'
 import UserManagement from '../views/modules/UserManagement.vue'
-import DataManagement from '../views/modules/DataManagement.vue'
 import ImageProcessing from '../views/modules/ImageProcessing.vue'
 import Dashboard from '../views/modules/Dashboard.vue'
 import PersonalInfo from '../views/modules/PersonalInfo.vue'
 import ConditionInfo from '../views/modules/ConditionInfo.vue'
+import EyeImageView from '../views/modules/EyeImageView.vue'
+import ReportView from '../views/modules/ReportView.vue'
+import MedicalRecord from '../views/modules/MedicalRecord.vue'
 
 const routes = [
   {
@@ -29,11 +31,6 @@ const routes = [
         component: UserManagement
       },
       {
-        path: '/data-management',
-        name: 'DataManagement',
-        component: DataManagement
-      },
-      {
         path: '/image-processing',
         name: 'ImageProcessing',
         component: ImageProcessing
@@ -52,6 +49,21 @@ const routes = [
         path: '/condition-info',
         name: 'ConditionInfo',
         component: ConditionInfo
+      },
+      {
+        path: '/eye-image-view',
+        name: 'EyeImageView',
+        component: EyeImageView
+      },
+      {
+        path: '/report-view',
+        name: 'ReportView',
+        component: ReportView
+      },
+      {
+        path: '/medical-record',
+        name: 'MedicalRecord',
+        component: MedicalRecord
       }
       // 其他子路由可以在这里添加
     ]
@@ -72,7 +84,7 @@ router.beforeEach((to, from, next) => {
     if (token) {
       next('/dashboard')
     } else {
-      next()
+    next()
     }
     return
   }

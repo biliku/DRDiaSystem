@@ -24,7 +24,7 @@
               <el-icon><component :is="item.icon" /></el-icon>
               <span>{{ item.label }}</span>
             </template>
-            <el-menu-item
+        <el-menu-item
               v-for="child in item.children"
               :key="child.path"
               :index="child.path"
@@ -34,9 +34,9 @@
           </el-sub-menu>
           <!-- 普通菜单项 -->
           <el-menu-item v-else :index="item.path">
-            <el-icon><component :is="item.icon" /></el-icon>
-            <span>{{ item.label }}</span>
-          </el-menu-item>
+          <el-icon><component :is="item.icon" /></el-icon>
+          <span>{{ item.label }}</span>
+        </el-menu-item>
         </template>
       </el-menu>
     </el-aside>
@@ -137,15 +137,12 @@ export default {
         '/dashboard': '首页',
         '/image-processing': '图像管理与预处理',
         '/disease-detection': '病变检测',
-        '/auxiliary-diagnosis': '辅助诊断',
-        '/report-generation': '诊断报告',
-        '/data-management': '数据管理',
         '/user-management': '用户管理',
         // 用户角色路由
         '/personal-info': '个人信息录入',
         '/condition-info': '病情信息录入',
         '/eye-image-view': '眼部影像查看',
-        '/report-view': '报告查看',
+        '/report-view': '报告复核',
         '/doctor-patient-chat': '医患交流',
         // 医生角色路由
         '/medical-record': '病历管理',
@@ -167,14 +164,13 @@ export default {
           ]
         },
         { path: '/eye-image-view', icon: 'View', label: '眼部影像查看' },
-        { path: '/report-view', icon: 'Document', label: '报告查看' },
+        { path: '/report-view', icon: 'Document', label: '诊断报告' },
         { path: '/doctor-patient-chat', icon: 'ChatDotRound', label: '医患交流' }
       ]
 
       // 医生（doctor）菜单
       const doctorMenus = [
-        { path: '/report-view', icon: 'Document', label: '报告查看' },
-        { path: '/auxiliary-diagnosis', icon: 'User', label: '辅助诊断' },
+        { path: '/report-view', icon: 'Document', label: '报告复核' },
         { path: '/medical-record', icon: 'Notebook', label: '病历管理' },
         { path: '/treatment-plan', icon: 'Promotion', label: '方案推荐' },
         { path: '/doctor-patient-chat', icon: 'ChatDotRound', label: '医患交流' }
@@ -185,8 +181,7 @@ export default {
         { path: '/dashboard', icon: 'DataLine', label: '首页' },
         { path: '/image-processing', icon: 'Picture', label: '图像管理与预处理' },
         { path: '/disease-detection', icon: 'Search', label: '病变检测' },
-        { path: '/report-generation', icon: 'Document', label: '诊断报告' },
-        { path: '/data-management', icon: 'Files', label: '数据管理' },
+        { path: '/report-view', icon: 'Files', label: 'AI诊断报告' },
         { path: '/user-management', icon: 'UserFilled', label: '用户管理' }
       ]
 

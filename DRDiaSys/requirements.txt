@@ -6,6 +6,7 @@ djangorestframework_simplejwt==5.5.0
 mysqlclient==2.2.7
 numpy==1.26.4
 opencv-python==4.11.0.86
+opencv-python-headless==4.11.0.86  # 明确指定版本以避免与 numpy 1.x 冲突
 pillow==11.2.1
 pygame==2.6.1
 PyJWT==2.9.0

@@ -19,20 +19,20 @@
               <el-card class="sidebar-filters" shadow="never">
                 <div class="filter-group">
                   <h4 class="filter-title">类型</h4>
-                  <el-radio-group v-model="selectedType" @change="applyFiltersAndResetPage">
-                    <el-radio label="all" size="large">全部</el-radio>
-                    <el-radio label="public" size="large">公开</el-radio>
-                    <el-radio label="clinical" size="large">临床</el-radio>
-                  </el-radio-group>
+                  <el-select v-model="selectedType" @change="applyFiltersAndResetPage" placeholder="选择类型" style="width: 100%">
+                    <el-option label="全部" value="all" />
+                    <el-option label="公开" value="public" />
+                    <el-option label="临床" value="clinical" />
+                  </el-select>
                 </div>
                 <el-divider />
                 <div class="filter-group">
                   <h4 class="filter-title">状态</h4>
-                  <el-radio-group v-model="selectedStatus" @change="applyFiltersAndResetPage">
-                    <el-radio label="all" size="large">全部</el-radio>
-                    <el-radio label="unprocessed" size="large">原始</el-radio>
-                    <el-radio label="processed" size="large">已处理</el-radio>
-                  </el-radio-group>
+                  <el-select v-model="selectedStatus" @change="applyFiltersAndResetPage" placeholder="选择状态" style="width: 100%">
+                    <el-option label="全部" value="all" />
+                    <el-option label="原始" value="unprocessed" />
+                    <el-option label="已处理" value="processed" />
+                  </el-select>
                 </div>
               </el-card>
             </el-col>
@@ -205,7 +205,138 @@
             </el-card>
           </div>
         </el-tab-pane>
+
+        <el-tab-pane v-if="showPatientUploadTab" label="患者上传影像" name="patientUploads">
+          <el-card class="patient-upload-card" shadow="never">
+            <div class="patient-upload-stats">
+              <div class="stat-item">
+                <p>影像数量</p>
+                <h3>{{ adminPatientStats.total }}</h3>
+              </div>
+              <div class="stat-item">
+                <p>累计容量</p>
+                <h3>{{ adminPatientStats.totalSizeLabel }}</h3>
+              </div>
+              <div class="stat-item">
+                <p>最近上传</p>
+                <h3>{{ adminPatientStats.latestTime }}</h3>
+              </div>
+            </div>
+
+            <div class="patient-toolbar">
+              <el-input
+                v-model="adminPatientSearch"
+                placeholder="搜索患者姓名或文件名"
+                clearable
+                class="patient-search"
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
+              <el-select v-model="adminEyeFilter" class="patient-eye-filter">
+                <el-option
+                  v-for="item in patientEyeOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </el-select>
+              <el-button type="primary" :loading="adminPatientLoading" @click="handleAdminRefresh">
+                <el-icon><RefreshRight /></el-icon>
+                刷新
+              </el-button>
+            </div>
+
+            <div v-loading="adminPatientLoading" class="patient-groups-container">
+              <el-collapse v-if="adminFilteredPatientGroups.length > 0" v-model="activePatientGroups" accordion>
+                <el-collapse-item
+                  v-for="patient in adminFilteredPatientGroups"
+                  :key="patient.patient_id"
+                  :name="patient.patient_id"
+                  class="patient-group-item"
+                >
+                  <template #title>
+                    <div class="patient-group-header">
+                      <div class="patient-info">
+                        <el-icon class="folder-icon"><Folder /></el-icon>
+                        <span class="patient-name">{{ patient.patient_name }}</span>
+                        <el-tag size="small" type="info" class="folder-tag">{{ patient.patient_folder }}</el-tag>
+                      </div>
+                      <div class="patient-stats">
+                        <span class="stat-text">{{ patient.total_images }} 张影像</span>
+                        <span class="stat-text">{{ formatPatientFileSize(patient.total_size) }}</span>
+                        <span class="stat-text" v-if="patient.latest_upload">
+                          最近: {{ formatPatientTime(patient.latest_upload) }}
+                        </span>
+                      </div>
+                    </div>
+                  </template>
+                  <div class="patient-images-table">
+                    <el-table
+                      :data="getFilteredPatientImages(patient.images)"
+                      size="default"
+                      :header-cell-style="{ background: '#f5f7fa', fontWeight: 600 }"
+                      empty-text="该患者暂无影像"
+                    >
+                      <el-table-column prop="original_name" label="文件名" min-width="220" show-overflow-tooltip />
+                      <el-table-column label="眼别" width="100">
+                        <template #default="scope">
+                          <el-tag size="small">{{ formatEyeLabel(scope.row.eye_side) }}</el-tag>
+                        </template>
+                      </el-table-column>
+                      <el-table-column prop="description" label="备注" min-width="200" show-overflow-tooltip />
+                      <el-table-column label="大小" width="100">
+                        <template #default="scope">
+                          {{ formatPatientFileSize(scope.row.file_size) }}
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="上传时间" width="180">
+                        <template #default="scope">
+                          {{ formatPatientTime(scope.row.created_at) }}
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="操作" width="100" align="center">
+                        <template #default="scope">
+                          <el-button type="primary" link size="small" @click="handleAdminPreview(scope.row)">
+                            <el-icon><ViewIcon /></el-icon>
+                            预览
+                          </el-button>
+                        </template>
+                      </el-table-column>
+                    </el-table>
+                  </div>
+                </el-collapse-item>
+              </el-collapse>
+              <el-empty v-else description="暂无患者上传记录" />
+            </div>
+          </el-card>
+        </el-tab-pane>
       </el-tabs>
+
+      <el-dialog
+        v-model="patientPreviewDialogVisible"
+        width="60%"
+        title="影像预览"
+        :close-on-click-modal="false"
+      >
+        <div class="patient-preview-body" v-loading="patientPreviewLoading">
+          <div v-if="patientPreviewInfo" class="patient-preview-meta">
+            <p><strong>患者：</strong>{{ patientPreviewInfo.owner_name || '未知' }}</p>
+            <p><strong>文件：</strong>{{ patientPreviewInfo.original_name }}</p>
+            <p><strong>眼别：</strong>{{ formatEyeLabel(patientPreviewInfo.eye_side) }}</p>
+            <p><strong>上传时间：</strong>{{ formatPatientTime(patientPreviewInfo.created_at) }}</p>
+          </div>
+          <div class="patient-preview-img" v-if="!patientPreviewLoading">
+            <img :src="patientPreviewUrl" alt="preview" />
+          </div>
+        </div>
+        <template #footer>
+          <span class="dialog-footer">
+            <el-button @click="patientPreviewDialogVisible = false">关闭</el-button>
+          </span>
+        </template>
+      </el-dialog>
 
       <!-- 添加/编辑 数据集对话框 -->
       <el-dialog
@@ -230,7 +361,7 @@
           </el-form-item>
 
           <el-form-item label="数据集类型" prop="type">
-            <el-select v-model="datasetForm.type" placeholder="请选择数据集类型" style="width: 100%;">
+            <el-select v-model="datasetForm.type" placeholder="请选择数据集类型（可选）" clearable style="width: 100%;">
               <el-option
                 v-for="item in datasetTypeOptions"
                 :key="item.value"
@@ -413,13 +544,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Plus, Search, UploadFilled, Folder, DocumentCopy as DocumentCopyIcon,
-  View as ViewIcon, Delete as DeleteIcon, Setting as SettingIcon, PriceTag as PriceTagIcon
+  View as ViewIcon, Delete as DeleteIcon, Setting as SettingIcon, PriceTag as PriceTagIcon,
+  RefreshRight
 } from '@element-plus/icons-vue'
 import axios from 'axios'
+import api from '../../api'
 
 const activeTab = ref('dataset')
 const searchQuery = ref('')
@@ -442,7 +575,7 @@ const isCopyCreateMode = ref(false); // True when '以此为模板创建' is use
 
 const datasetForm = ref({
   name: '',
-  type: 'public',
+  type: '', // 改为可选，默认为空
   description: '',
   files: [],
   sourceMethod: 'upload',
@@ -451,9 +584,8 @@ const datasetForm = ref({
 const fileList = ref([])
 
 const datasetTypeOptions = ref([
-  { value: 'public', label: '公开数据集' },
-  { value: 'clinical', label: '临床研究' },
-  { value: 'private', label: '私有项目' },
+  { value: 'public', label: '公开' },
+  { value: 'clinical', label: '临床' },
 ])
 
 const rules = ref({
@@ -462,7 +594,7 @@ const rules = ref({
     { min: 3, max: 50, message: '长度在 3 到 50 个字符', trigger: 'blur' }
   ],
   type: [
-    { required: true, message: '请选择数据集类型', trigger: 'change' }
+    // 类型改为可选，不再强制要求
   ],
   sourceMethod: [
     { required: true, message: '请选择图片来源', trigger: 'change' }
@@ -517,6 +649,193 @@ const directories = ref([])
 const previewSearchQuery = ref('')
 const originalPreviewImages = ref([])
 
+const userRole = ref(localStorage.getItem('userRole') || 'admin')
+const showPatientUploadTab = computed(() => userRole.value === 'admin')
+const adminPatientGroups = ref([]) // 按患者分组的数据
+const adminPatientLoading = ref(false)
+const adminPatientSearch = ref('')
+const adminEyeFilter = ref('all')
+const patientImagesLoaded = ref(false)
+const patientPreviewDialogVisible = ref(false)
+const patientPreviewUrl = ref('')
+const patientPreviewObjectUrl = ref(null)
+const patientPreviewInfo = ref(null)
+const patientPreviewLoading = ref(false)
+const activePatientGroups = ref([]) // 控制折叠面板展开状态
+
+const patientEyeOptions = [
+  { label: '全部', value: 'all' },
+  { label: '左眼', value: 'left' },
+  { label: '右眼', value: 'right' },
+  { label: '双眼', value: 'both' },
+  { label: '未标记', value: 'unknown' }
+]
+
+const formatPatientFileSize = (size) => {
+  if (!size) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let index = 0
+  let value = size
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024
+    index++
+  }
+  return `${value.toFixed(1)} ${units[index]}`
+}
+
+const formatPatientTime = (value) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleString()
+}
+
+const formatEyeLabel = (value) => {
+  const map = {
+    left: '左眼',
+    right: '右眼',
+    both: '双眼',
+    unknown: '未标记'
+  }
+  return map[value] || '未标记'
+}
+
+const fetchAdminPatientImages = async () => {
+  if (!showPatientUploadTab.value) return
+  try {
+    adminPatientLoading.value = true
+    const { data } = await api.get('/api/datasets/admin/patient-images/')
+    // 后端现在返回按患者分组的数据
+    adminPatientGroups.value = Array.isArray(data) ? data : []
+    patientImagesLoaded.value = true
+  } catch (error) {
+    console.error('获取患者影像失败', error)
+    ElMessage.error(error.response?.data?.message || '获取患者影像失败')
+  } finally {
+    adminPatientLoading.value = false
+  }
+}
+
+// 过滤患者组：根据患者名称或文件夹名称
+const adminFilteredPatientGroups = computed(() => {
+  const keyword = adminPatientSearch.value.trim().toLowerCase()
+  if (!keyword && adminEyeFilter.value === 'all') {
+    return adminPatientGroups.value
+  }
+  
+  return adminPatientGroups.value.filter(patient => {
+    // 检查患者名称或文件夹名称是否匹配
+    const matchPatient = keyword
+      ? (patient.patient_name || '').toLowerCase().includes(keyword) ||
+        (patient.patient_folder || '').toLowerCase().includes(keyword)
+      : true
+    
+    // 如果匹配患者，还需要检查该患者是否有匹配的影像
+    if (matchPatient) {
+      const hasMatchingImages = getFilteredPatientImages(patient.images).length > 0
+      return hasMatchingImages
+    }
+    
+    return false
+  })
+})
+
+// 过滤单个患者组内的影像
+const getFilteredPatientImages = (images) => {
+  const keyword = adminPatientSearch.value.trim().toLowerCase()
+  const eyeFilter = adminEyeFilter.value
+  
+  return images.filter(image => {
+    const matchKeyword = keyword
+      ? (image.original_name || '').toLowerCase().includes(keyword) ||
+        (image.description || '').toLowerCase().includes(keyword)
+      : true
+    const matchEye = eyeFilter === 'all' ? true : image.eye_side === eyeFilter
+    return matchKeyword && matchEye
+  })
+}
+
+const adminPatientStats = computed(() => {
+  // 统计所有患者组的数据
+  let total = 0
+  let totalSize = 0
+  let latestTime = null
+  
+  adminPatientGroups.value.forEach(patient => {
+    total += patient.total_images || 0
+    totalSize += patient.total_size || 0
+    if (patient.latest_upload) {
+      const uploadTime = new Date(patient.latest_upload)
+      if (!latestTime || uploadTime > latestTime) {
+        latestTime = uploadTime
+      }
+    }
+  })
+  
+  return {
+    total,
+    totalSizeLabel: formatPatientFileSize(totalSize),
+    latestTime: latestTime ? formatPatientTime(latestTime.toISOString()) : '-'
+  }
+})
+
+const handleAdminRefresh = () => {
+  fetchAdminPatientImages()
+}
+
+const loadPreviewBlob = async (imageId) => {
+  const { data } = await api.get(`/api/datasets/patient/images/${imageId}/download/`, {
+    params: { mode: 'inline' },
+    responseType: 'blob'
+  })
+  return URL.createObjectURL(data)
+}
+
+const handleAdminPreview = async (row) => {
+  patientPreviewInfo.value = row
+  patientPreviewLoading.value = true
+  patientPreviewDialogVisible.value = true
+  try {
+    if (patientPreviewObjectUrl.value) {
+      URL.revokeObjectURL(patientPreviewObjectUrl.value)
+      patientPreviewObjectUrl.value = null
+    }
+    const objectUrl = await loadPreviewBlob(row.id)
+    patientPreviewObjectUrl.value = objectUrl
+    patientPreviewUrl.value = objectUrl
+  } catch (error) {
+    console.error('预览加载失败', error)
+    ElMessage.error(error.response?.data?.message || '预览加载失败，请稍后再试')
+    patientPreviewDialogVisible.value = false
+  } finally {
+    patientPreviewLoading.value = false
+  }
+}
+
+watch(activeTab, (val) => {
+  if (val === 'patientUploads' && showPatientUploadTab.value && !patientImagesLoaded.value) {
+    fetchAdminPatientImages()
+  }
+})
+
+watch(patientPreviewDialogVisible, (val) => {
+  if (!val) {
+    patientPreviewUrl.value = ''
+    patientPreviewInfo.value = null
+    patientPreviewLoading.value = false
+    if (patientPreviewObjectUrl.value) {
+      URL.revokeObjectURL(patientPreviewObjectUrl.value)
+      patientPreviewObjectUrl.value = null
+    }
+  }
+})
+
+onMounted(() => {
+  fetchDatasetList()
+  if (activeTab.value === 'patientUploads' && showPatientUploadTab.value) {
+    fetchAdminPatientImages()
+  }
+})
 
 const fetchDatasetList = async () => {
   try {
@@ -585,7 +904,8 @@ const getTableStatusLabel = (status, version) => {
 }
 
 const getDatasetTypeLabel = (type) => {
-  const labels = { public: '公开', clinical: '临床', private: '私有项目' }
+  if (!type) return '未分类'
+  const labels = { public: '公开', clinical: '临床' }
   return labels[type] || type
 }
 
@@ -619,7 +939,7 @@ const handleAddDataset = (templateData = null) => {
     isCopyCreateMode.value = true;
     datasetForm.value = {
       name: `${templateData.name || '新数据集'}_副本`,
-      type: templateData.type || 'public',
+      type: templateData.type || '', // 改为可选
       description: templateData.description || '',
       sourceMethod: 'upload', // Default to upload, user must re-select files
       files: [],
@@ -637,7 +957,7 @@ const handleAddDataset = (templateData = null) => {
 const resetDatasetFormInternal = () => {
   datasetForm.value = {
     name: '',
-    type: 'public',
+    type: '', // 改为可选，默认为空
     description: '',
     files: [],
     sourceMethod: 'upload',
@@ -674,7 +994,7 @@ const submitDataset = async () => {
 
     const payload = {
       name: datasetForm.value.name,
-      type: datasetForm.value.type,
+      type: datasetForm.value.type || null, // 如果为空则发送null
       description: datasetForm.value.description,
       base_path: basePathForAPI,
     };
@@ -1198,6 +1518,71 @@ onMounted(async () => {
   justify-content: center;
 }
 
+.patient-upload-card {
+  margin-top: 20px;
+}
+
+.patient-upload-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.patient-upload-stats .stat-item {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.patient-upload-stats .stat-item h3 {
+  margin: 6px 0 0;
+  font-size: 22px;
+  color: #303133;
+}
+
+.patient-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.patient-search {
+  flex: 1;
+  min-width: 240px;
+}
+
+.patient-eye-filter {
+  width: 160px;
+}
+
+.patient-preview-body {
+  min-height: 300px;
+}
+
+.patient-preview-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+  color: #606266;
+}
+
+.patient-preview-img {
+  text-align: center;
+}
+
+.patient-preview-img img {
+  max-width: 100%;
+  max-height: 480px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
 :deep(.dataset-dialog),
 :deep(.process-dialog) {
   border-radius: 8px;
@@ -1318,5 +1703,137 @@ onMounted(async () => {
 }
 :deep(.dataset-form .el-form-item) {
   margin-bottom: 22px;
+}
+
+/* 患者上传影像样式 */
+.patient-upload-card {
+  margin-top: 20px;
+}
+
+.patient-upload-stats {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 20px;
+  padding: 20px;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.patient-upload-stats .stat-item {
+  flex: 1;
+  text-align: center;
+}
+
+.patient-upload-stats .stat-item p {
+  margin: 0 0 8px 0;
+  color: #909399;
+  font-size: 14px;
+}
+
+.patient-upload-stats .stat-item h3 {
+  margin: 0;
+  color: #303133;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.patient-toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  align-items: center;
+}
+
+.patient-search {
+  flex: 1;
+  max-width: 300px;
+}
+
+.patient-eye-filter {
+  width: 150px;
+}
+
+/* 患者分组容器 */
+.patient-groups-container {
+  margin-top: 20px;
+}
+
+.patient-group-item {
+  margin-bottom: 12px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.patient-group-item :deep(.el-collapse-item__header) {
+  padding: 16px 20px;
+  background: #fafafa;
+  border-bottom: 1px solid #e4e7ed;
+  font-weight: 500;
+}
+
+.patient-group-item :deep(.el-collapse-item__header:hover) {
+  background: #f0f2f5;
+}
+
+.patient-group-item :deep(.el-collapse-item__content) {
+  padding: 0;
+}
+
+.patient-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.patient-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.folder-icon {
+  font-size: 20px;
+  color: #409eff;
+}
+
+.patient-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.folder-tag {
+  margin-left: 8px;
+}
+
+.patient-stats {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.patient-stats .stat-text {
+  font-size: 13px;
+  color: #606266;
+}
+
+.patient-images-table {
+  padding: 16px;
+  background: #fff;
+}
+
+.patient-images-table :deep(.el-table) {
+  border: none;
+}
+
+.patient-images-table :deep(.el-table__header) {
+  background: #f5f7fa;
 }
 </style>
