@@ -14,6 +14,22 @@ from django.db import models
 from .models import PatientInfo, ConditionInfo
 from .serializers import PatientInfoSerializer, ConditionInfoSerializer
 
+def _is_doctor(user):
+    profile = getattr(user, 'profile', None)
+    role = getattr(profile, 'role', None)
+    if role == 'doctor':
+        return True
+    # 兼容通过用户组判定的医生角色
+    return user.groups.filter(name='doctor').exists()
+
+def _is_admin(user):
+    profile = getattr(user, 'profile', None)
+    role = getattr(profile, 'role', None)
+    if role == 'admin':
+        return True
+    # 兼容通过用户组判定的管理员角色
+    return user.is_superuser or user.groups.filter(name='admin').exists()
+
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
     return {
@@ -90,6 +106,40 @@ def login(request):
         'username': user.username,
         'userRole': user_role
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def patient_list(request):
+    """
+    医生/管理员获取患者列表，支持关键字搜索
+    """
+    if not (_is_admin(request.user) or _is_doctor(request.user)):
+        return Response({'message': '仅医生或管理员可获取患者列表'}, status=status.HTTP_403_FORBIDDEN)
+
+    keyword = request.query_params.get('search', '').strip()
+    queryset = User.objects.filter(profile__role='patient').select_related('patient_info')
+
+    if keyword:
+        queryset = queryset.filter(
+            models.Q(username__icontains=keyword) |
+            models.Q(email__icontains=keyword) |
+            models.Q(patient_info__real_name__icontains=keyword) |
+            models.Q(patient_info__phone__icontains=keyword)
+        )
+
+    data = []
+    for user in queryset.order_by('username')[:200]:
+        info = getattr(user, 'patient_info', None)
+        data.append({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'real_name': getattr(info, 'real_name', '') or '',
+            'phone': getattr(info, 'phone', '') or '',
+        })
+
+    return Response(data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

@@ -9,6 +9,9 @@ import ConditionInfo from '../views/modules/ConditionInfo.vue'
 import EyeImageView from '../views/modules/EyeImageView.vue'
 import ReportView from '../views/modules/ReportView.vue'
 import MedicalRecord from '../views/modules/MedicalRecord.vue'
+import TreatmentPlan from '../views/modules/TreatmentPlan.vue'
+import PatientTreatmentPlan from '../views/modules/PatientTreatmentPlan.vue'
+import DoctorPatientChat from '../views/modules/DoctorPatientChat.vue'
 
 const routes = [
   {
@@ -64,6 +67,21 @@ const routes = [
         path: '/medical-record',
         name: 'MedicalRecord',
         component: MedicalRecord
+      },
+      {
+        path: '/treatment-plan',
+        name: 'TreatmentPlan',
+        component: TreatmentPlan
+      },
+      {
+        path: '/patient-treatment-plan',
+        name: 'PatientTreatmentPlan',
+        component: PatientTreatmentPlan
+      },
+      {
+        path: '/doctor-patient-chat',
+        name: 'DoctorPatientChat',
+        component: DoctorPatientChat
       }
       // 其他子路由可以在这里添加
     ]

@@ -146,7 +146,9 @@ export default {
         '/doctor-patient-chat': '医患交流',
         // 医生角色路由
         '/medical-record': '病历管理',
-        '/treatment-plan': '方案推荐'
+        '/treatment-plan': '方案推荐',
+        // 患者角色路由
+        '/patient-treatment-plan': '我的治疗方案'
       }
       return routeMap[this.$route.path] || '';
     },
@@ -165,6 +167,7 @@ export default {
         },
         { path: '/eye-image-view', icon: 'View', label: '眼部影像查看' },
         { path: '/report-view', icon: 'Document', label: '诊断报告' },
+        { path: '/patient-treatment-plan', icon: 'Promotion', label: '我的治疗方案' },
         { path: '/doctor-patient-chat', icon: 'ChatDotRound', label: '医患交流' }
       ]
 

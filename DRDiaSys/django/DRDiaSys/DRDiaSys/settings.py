@@ -43,7 +43,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'users',
     'datasets',
-    'diagnosis'
+    'diagnosis',
+    'treatment',
 ]
 
 MIDDLEWARE = [
