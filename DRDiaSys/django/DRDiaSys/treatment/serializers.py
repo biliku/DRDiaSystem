@@ -13,7 +13,7 @@ from diagnosis.serializers import CaseRecordSerializer, DiagnosisReportSerialize
 
 class TreatmentPlanTemplateSerializer(serializers.ModelSerializer):
     """治疗方案模板序列化器"""
-    
+
     class Meta:
         model = TreatmentPlanTemplate
         fields = [
@@ -21,9 +21,25 @@ class TreatmentPlanTemplateSerializer(serializers.ModelSerializer):
             'dr_grade',
             'lesion_types',
             'diabetes_type',
+            # 基础管理目标
+            'blood_sugar_target',
+            'blood_pressure_target',
+            'lipid_management',
+            # 眼科治疗
+            'anti_vegf_treatment',
+            'laser_treatment',
+            'surgical_treatment',
+            # 药物治疗
             'medications',
-            'follow_up_plan',
+            # 生活方式干预
+            'diet_guidance',
+            'exercise_guidance',
             'lifestyle_advice',
+            # 随访监测
+            'follow_up_plan',
+            'monitoring_plan',
+            'warning_symptoms',
+            # 其他
             'precautions',
             'priority',
             'is_active',
@@ -35,14 +51,14 @@ class TreatmentPlanTemplateSerializer(serializers.ModelSerializer):
 
 class TreatmentPlanSerializer(serializers.ModelSerializer):
     """治疗方案序列化器"""
-    
+
     case_info = CaseRecordSerializer(source='case', read_only=True)
     related_report_info = DiagnosisReportSerializer(source='related_report', read_only=True)
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
     confirmed_by_name = serializers.CharField(source='confirmed_by.username', read_only=True)
     template_info = TreatmentPlanTemplateSerializer(source='template_used', read_only=True)
     execution_count = serializers.IntegerField(source='executions.count', read_only=True)
-    
+
     class Meta:
         model = TreatmentPlan
         fields = [
@@ -54,19 +70,39 @@ class TreatmentPlanSerializer(serializers.ModelSerializer):
             'plan_number',
             'title',
             'status',
+            # 基础管理目标
+            'blood_sugar_target',
+            'blood_pressure_target',
+            'lipid_management',
+            # 眼科治疗
+            'treatments',
+            'anti_vegf_treatment',
+            'laser_treatment',
+            'surgical_treatment',
+            # 药物治疗
             'medications',
-            'follow_up_plan',
+            # 生活方式干预
+            'diet_guidance',
+            'exercise_guidance',
             'lifestyle_advice',
+            # 随访监测
+            'follow_up_plan',
+            'monitoring_plan',
+            'warning_symptoms',
+            # 其他
             'precautions',
+            # AI推荐信息
             'is_ai_recommended',
             'ai_recommendation_score',
             'template_used',
             'template_info',
+            # 医生信息
             'created_by',
             'created_by_name',
             'confirmed_by',
             'confirmed_by_name',
             'confirmed_at',
+            # 时间戳
             'created_at',
             'updated_at',
             'start_date',
@@ -96,14 +132,29 @@ class TreatmentPlanExecutionSerializer(serializers.ModelSerializer):
             'plan_info',
             'execution_date',
             'medication_taken',
+            'medication_notes',
             'follow_up_completed',
             'patient_feedback',
             'doctor_notes',
+            # 血糖记录
+            'blood_sugar_fasting',
+            'blood_sugar_postprandial',
+            'blood_sugar_hba1c',
+            # 血压记录
+            'blood_pressure_systolic',
+            'blood_pressure_diastolic',
+            # 饮食记录
+            'diet_completed',
+            'diet_notes',
+            # 运动记录
+            'exercise_completed',
+            'exercise_notes',
+            # 记录信息
             'created_by',
             'created_by_name',
             'created_at',
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'plan', 'created_at', 'created_by', 'created_by_name']
 
 
 class MessageSerializer(serializers.ModelSerializer):

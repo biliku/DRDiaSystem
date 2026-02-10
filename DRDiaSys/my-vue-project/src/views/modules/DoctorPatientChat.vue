@@ -99,10 +99,10 @@
           <!-- 消息列表 -->
           <div class="message-list" ref="messageListRef" v-loading="messageLoading">
             <div
-              v-for="msg in messages"
-              :key="msg.id"
-              class="message-item"
-              :class="{ 'message-sent': msg.sender === currentUserId, 'message-received': msg.sender !== currentUserId }"
+            v-for="msg in messages"
+            :key="msg.id"
+            class="message-item"
+            :class="{ 'message-sent': isSent(msg), 'message-received': !isSent(msg) }"
             >
               <el-avatar :size="32" class="message-avatar">
                 {{ msg.sender_name?.charAt(0) }}
@@ -178,6 +178,7 @@
                 ref="fileInputRef"
                 type="file"
                 style="display: none"
+                :accept="currentFileType === 'image' ? 'image/*' : '.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar'"
                 @change="handleFileSelect"
               />
             </div>
@@ -353,6 +354,28 @@ export default {
         this.conversationLoading = false
       }
     },
+    isSent(msg) {
+      try {
+        const uid = this.currentUserId || Number(localStorage.getItem('userId') || '0')
+        // msg.sender may be id, string id, or nested object; also compare sender_name as fallback
+        if (!msg) return false
+        if (msg.sender && typeof msg.sender === 'number') {
+          if (Number(msg.sender) === uid) return true
+        }
+        if (msg.sender && typeof msg.sender === 'string') {
+          if (Number(msg.sender) === uid || msg.sender === String(uid)) return true
+        }
+        if (msg.sender && typeof msg.sender === 'object' && (msg.sender.id || msg.sender.pk)) {
+          const sid = Number(msg.sender.id || msg.sender.pk)
+          if (sid === uid) return true
+        }
+        const userName = localStorage.getItem('userName')
+        if (msg.sender_name && userName && msg.sender_name === userName) return true
+      } catch (e) {
+        // ignore
+      }
+      return false
+    },
     filterConversations() {
       if (!this.conversationSearchQuery) {
         this.filteredConversations = this.conversations
@@ -367,6 +390,8 @@ export default {
     async selectConversation(conversation) {
       this.selectedConversation = conversation
       await this.fetchMessages()
+      // 刷新会话列表以更新未读数
+      await this.fetchConversations()
       // 滚动到底部
       this.$nextTick(() => {
         this.scrollToBottom()
@@ -409,15 +434,36 @@ export default {
     },
     openFileUpload(type = 'image') {
       this.currentFileType = type
-      this.fileInputRef?.click()
+      // clear previous selection
+      if (this.$refs.fileInputRef) {
+        this.$refs.fileInputRef.value = null
+        this.$refs.fileInputRef.click()
+      }
     },
     async handleFileSelect(event) {
       const file = event.target.files[0]
       if (!file) return
-
-      if (this.currentFileType === 'image' && !file.type.startsWith('image/')) {
-        ElMessage.warning('请选择图片文件')
+      // frontend-level validation for common types/sizes
+      const maxSize = 10 * 1024 * 1024 // 10MB
+      if (file.size > maxSize) {
+        ElMessage.warning('文件过大，最大支持 10MB')
+        event.target.value = ''
         return
+      }
+      if (this.currentFileType === 'image') {
+        if (!file.type.startsWith('image/')) {
+          ElMessage.warning('请选择图片文件')
+          event.target.value = ''
+          return
+        }
+      } else {
+        const allowedExt = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.zip', '.rar']
+        const ext = (file.name.match(/(\.[^.]+)$/) || [''])[0].toLowerCase()
+        if (!allowedExt.includes(ext)) {
+          ElMessage.warning('不支持的文件类型')
+          event.target.value = ''
+          return
+        }
       }
 
       const formData = new FormData()
@@ -441,16 +487,23 @@ export default {
       }
     },
     downloadFile(fileUrl, fileName) {
-      const url = `http://localhost:8000${fileUrl}`
+      const url = this.getFileUrl(fileUrl)
       const link = document.createElement('a')
-      link.href = url
+      link.href = encodeURI(url)
       link.download = fileName
+      // ensure new tab if browser blocks direct download
+      link.target = '_blank'
+      document.body.appendChild(link)
       link.click()
+      document.body.removeChild(link)
     },
     getFileUrl(url) {
       if (!url) return ''
       if (url.startsWith('http')) return url
-      return `http://localhost:8000${url}`
+      // ensure leading slash
+      const path = url.startsWith('/') ? url : `/${url}`
+      const origin = window.location.origin || 'http://localhost:8000'
+      return `${origin}${path}`
     },
     scrollToBottom() {
       if (this.messageListRef) {
@@ -728,6 +781,14 @@ export default {
 .message-sent .message-body {
   background-color: #409eff;
   color: #fff;
+}
+
+/* 对齐文本：己方消息右对齐，对方消息左对齐 */
+.message-item.message-sent .message-content {
+  text-align: right;
+}
+.message-item.message-received .message-content {
+  text-align: left;
 }
 
 .message-text {

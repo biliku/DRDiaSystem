@@ -3,8 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
-import torchvision.transforms as transforms
+from torch.utils.data import Dataset, DataLoader
 import torchvision.models as models
 import pandas as pd
 import numpy as np
@@ -24,13 +23,14 @@ warnings.filterwarnings('ignore')
 plt.rcParams['font.sans-serif'] = ['SimHei']
 plt.rcParams['axes.unicode_minus'] = False
 
+# --- 超参数配置（增强版） ---
 IMG_SIZE = 384
-BATCH_SIZE = 16  # 减少batch size
+BATCH_SIZE = 32  # 增大batch size提升稳定性
 NUM_WORKERS = 4
-NUM_EPOCHS = 15  # 大幅减少epoch
-LEARNING_RATE = 1e-5  # 显著降低学习率
+NUM_EPOCHS = 60  # 进一步延长训练时间
+LEARNING_RATE = 1e-4  # 基础学习率，配合分层学习率策略
 NUM_CLASSES = 5
-MODEL_SAVE_PATH = "best_resnet_aptos_improved.pth"
+MODEL_SAVE_PATH = "best_resnet_aptos_enhanced.pth"  # 使用新的模型保存路径
 # use raw string to avoid escape sequences like \a being interpreted
 DATA_ROOT = r'F:\DRDiaSys\DRDiaSys\django\DRDiaSys\datasets\dataset\aptos2019_preprocessed'
 TRAIN_CSV_PATH = os.path.join(DATA_ROOT, 'train.csv')
@@ -44,17 +44,67 @@ TEST_IMAGE_DIR = os.path.join(DATA_ROOT, 'test_images_processed')
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"使用设备: {DEVICE}")
 
-# --- 最小化数据增强 ---
+# --- 眼底图像专用数据增强 ---
 class AdvancedDataTransforms:
+    """
+    针对眼底图像特点设计的增强策略：
+    1. 模拟不同拍摄条件（亮度、对比度、颜色）
+    2. 模拟图像几何变换（旋转、翻转）
+    3. 模拟病变区域变化
+    """
     def __init__(self):
-        # 极简数据增强
+        # 训练集：丰富的增强策略
         self.train_transforms = A.Compose([
+            # 几何变换
             A.Resize(IMG_SIZE, IMG_SIZE),
-            A.HorizontalFlip(p=0.3),
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.RandomRotate90(p=0.5),
+            A.ShiftScaleRotate(
+                shift_limit=0.1,
+                scale_limit=0.1,
+                rotate_limit=30,
+                border_mode=cv2.BORDER_REFLECT,
+                p=0.5
+            ),
+            
+            # 亮度/对比度/颜色增强（模拟不同相机和曝光条件）
+            A.OneOf([
+                A.RandomBrightnessContrast(
+                    brightness_limit=0.2,
+                    contrast_limit=0.2,
+                    p=1
+                ),
+                A.HueSaturationValue(
+                    hue_shift_limit=10,
+                    sat_shift_limit=20,
+                    val_shift_limit=10,
+                    p=1
+                ),
+            ], p=0.6),
+            
+            # 颜色变换（模拟不同设备）
+            A.ColorJitter(
+                brightness=0.1,
+                contrast=0.1,
+                saturation=0.1,
+                hue=0.05,
+                p=0.3
+            ),
+            
+            # 模糊增强（模拟低质量图像）
+            A.OneOf([
+                A.GaussNoise(var_limit=(10.0, 50.0), p=1),
+                A.GaussianBlur(blur_limit=(3, 5), p=1),
+                A.MotionBlur(blur_limit=3, p=1),
+            ], p=0.2),
+            
+            # 标准化（ImageNet标准）
             A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ToTensorV2(),
         ])
         
+        # 验证/测试集：仅标准化
         self.val_transforms = A.Compose([
             A.Resize(IMG_SIZE, IMG_SIZE),
             A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
@@ -104,40 +154,93 @@ class ImprovedDRDataset(Dataset):
         class_weights = compute_class_weight('balanced', classes=np.unique(labels), y=labels)
         return torch.FloatTensor(class_weights)
 
-# --- 极度简化的模型架构 ---
+# --- 改进的模型架构 ---
 class ImprovedResNetDR(nn.Module):
-    def __init__(self, num_classes=5, pretrained=True, dropout_rate=0.7):
+    """
+    改进的糖尿病视网膜病变分类模型：
+    - 基于ResNet34骨干网络（ImageNet预训练）
+    - 简化的分类头（避免过度正则化）
+    - 分层微调策略
+    """
+    def __init__(self, num_classes=5, pretrained=True, dropout_rate=0.5):
         super(ImprovedResNetDR, self).__init__()
         
-        # 使用ResNet34
-        self.backbone = models.resnet34(pretrained=pretrained)
+        # 使用ResNet34作为骨干网络
+        self.backbone = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1 if pretrained else None)
         
-        # 冻结前面的层
-        for name, param in self.backbone.named_parameters():
-            if 'layer3' not in name and 'layer4' not in name and 'fc' not in name:
-                param.requires_grad = False
-        
+        # 获取特征维度
         num_features = self.backbone.fc.in_features
         
-        # 简化分类头
+        # 简化的分类头（避免过度正则化）
         self.backbone.fc = nn.Sequential(
-            nn.Dropout(dropout_rate),
-            nn.Linear(num_features, 128),
-            nn.ReLU(inplace=True),
-            nn.BatchNorm1d(128),
-            nn.Dropout(dropout_rate),
-            nn.Linear(128, num_classes)
+            nn.Dropout(dropout_rate),  # 适度的Dropout
+            nn.Linear(num_features, num_classes)
         )
         
+        # 初始化新添加的分类头权重
+        self._init_classifier()
+    
+    def _init_classifier(self):
+        """初始化分类头权重"""
+        for m in self.backbone.fc:
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+    
+    def get_layer_groups(self):
+        """获取层分组用于分层学习率"""
+        # 分层策略：浅层低学习率，深层高学习率
+        backbone = self.backbone
+        
+        # Layer1-2: 冻结，使用极低学习率
+        layer1_params = []
+        layer2_params = []
+        
+        # Layer3-4: 微调，使用中等学习率
+        layer3_params = []
+        layer4_params = []
+        
+        # FC层: 高学习率
+        fc_params = []
+        
+        for name, param in backbone.named_parameters():
+            if 'layer1' in name:
+                layer1_params.append(param)
+            elif 'layer2' in name:
+                layer2_params.append(param)
+            elif 'layer3' in name:
+                layer3_params.append(param)
+            elif 'layer4' in name:
+                layer4_params.append(param)
+            elif 'fc' in name:
+                fc_params.append(param)
+        
+        return [
+            {'params': layer1_params, 'lr': LEARNING_RATE * 0.1},
+            {'params': layer2_params, 'lr': LEARNING_RATE * 0.5},
+            {'params': layer3_params, 'lr': LEARNING_RATE * 1.0},
+            {'params': layer4_params, 'lr': LEARNING_RATE * 2.0},
+            {'params': fc_params, 'lr': LEARNING_RATE * 5.0},
+        ]
+    
     def forward(self, x):
         return self.backbone(x)
 
 # --- 混合损失函数 ---
 class MixedLoss(nn.Module):
-    def __init__(self, alpha=0.7, class_weights=None):
+    """
+    混合损失函数：结合交叉熵损失和MSE损失
+    - 利用类别间的有序关系（DR分级是0-4的有序关系）
+    - 加入类别权重处理不平衡数据
+    """
+    def __init__(self, alpha=0.7, class_weights=None, label_smoothing=0.1):
         super(MixedLoss, self).__init__()
         self.alpha = alpha
-        self.ce_loss = nn.CrossEntropyLoss(weight=class_weights)
+        self.ce_loss = nn.CrossEntropyLoss(
+            weight=class_weights, 
+            label_smoothing=label_smoothing  # Label Smoothing
+        )
         self.mse_loss = nn.MSELoss()
         
     def forward(self, pred, target):
@@ -145,24 +248,154 @@ class MixedLoss(nn.Module):
         # 将分类问题视为回归问题
         pred_soft = F.softmax(pred, dim=1)
         target_reg = target.float().unsqueeze(1)
-        pred_reg = torch.sum(pred_soft * torch.arange(5).float().to(pred.device), dim=1, keepdim=True)
+        pred_reg = torch.sum(pred_soft * torch.arange(NUM_CLASSES).float().to(pred.device), dim=1, keepdim=True)
         mse = self.mse_loss(pred_reg, target_reg)
         
         return self.alpha * ce + (1 - self.alpha) * mse
 
-# --- 改进的训练函数 ---
-def train_model_with_early_stopping(model, train_loader, val_loader, criterion, optimizer, scheduler, num_epochs, patience=3):
+
+# --- Focal Loss（对难分类样本加权） ---
+class FocalLoss(nn.Module):
+    """
+    Focal Loss：专注于难分类的样本
+    - alpha: 类别权重
+    - gamma: 聚焦参数，越大越关注难样本
+    - 适用于类别不平衡和难易样本不均衡的情况
+    """
+    def __init__(self, alpha=None, gamma=2.0, label_smoothing=0.1):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.label_smoothing = label_smoothing
+        
+        if alpha is None:
+            self.alpha = torch.ones(NUM_CLASSES)
+        else:
+            self.alpha = alpha
+            
+    def forward(self, pred, target):
+        # 带 Label Smoothing 的交叉熵
+        ce_loss = F.cross_entropy(pred, target, label_smoothing=self.label_smoothing)
+        
+        # 计算 pt（预测概率）
+        pt = F.softmax(pred, dim=1)
+        pt = pt.gather(1, target.view(-1, 1)).squeeze(1)
+        
+        # Focal 权重
+        focal_weight = (1 - pt) ** self.gamma
+        
+        # 类别权重
+        alpha = self.alpha.to(pred.device)
+        alpha_weight = alpha.gather(0, target)
+        
+        loss = alpha_weight * focal_weight * ce_loss
+        return loss.mean()
+
+
+# --- MixUp 数据增强 ---
+class MixUp:
+    """
+    MixUp 数据增强：
+    - 随机混合两个样本及其标签
+    - 有效减少过拟合，提高泛化能力
+    - beta: Beta分布参数，值越大混合程度越大
+    """
+    def __init__(self, alpha=0.4):
+        self.alpha = alpha
+        
+    def __call__(self, images, labels):
+        """
+        对一批图像和标签进行 MixUp
+        """
+        batch_size = images.size(0)
+        
+        # 随机打乱顺序
+        index = torch.randperm(batch_size)
+        
+        # 采样混合系数 lambda ~ Beta(alpha, alpha)
+        lam = np.random.beta(self.alpha, self.alpha)
+        lam = max(lam, 1 - lam)  # 保证 lam >= 0.5
+        
+        # 混合图像
+        mixed_images = lam * images + (1 - lam) * images[index]
+        
+        # 混合标签（one-hot 编码）
+        labels_onehot = F.one_hot(labels, num_classes=NUM_CLASSES).float()
+        mixed_labels = lam * labels_onehot + (1 - lam) * labels_onehot[index]
+        
+        return mixed_images, mixed_labels
+
+
+# --- CutMix 数据增强 ---
+class CutMix:
+    """
+    CutMix：将一个样本的矩形区域替换为另一个样本
+    - beta: Beta分布参数
+    - cutmix_prob: 应用 CutMix 的概率
+    """
+    def __init__(self, beta=1.0, cutmix_prob=0.5):
+        self.beta = beta
+        self.cutmix_prob = cutmix_prob
+        
+    def __call__(self, images, labels):
+        if np.random.rand() > self.cutmix_prob:
+            return images, labels
+            
+        batch_size = images.size(0)
+        
+        # 随机打乱顺序
+        index = torch.randperm(batch_size)
+        
+        # 采样混合系数 lambda ~ Beta(beta, beta)
+        lam = np.random.beta(self.beta, self.beta)
+        lam = max(lam, 1 - lam)
+        
+        # 计算裁剪区域
+        B, C, H, W = images.shape
+        cx = np.random.randint(W)
+        cy = np.random.randint(H)
+        cut_w = int(W * np.sqrt(1 - lam))
+        cut_h = int(H * np.sqrt(1 - lam))
+        
+        x1 = np.clip(cx - cut_w // 2, 0, W)
+        x2 = np.clip(cx + cut_w // 2, 0, W)
+        y1 = np.clip(cy - cut_h // 2, 0, H)
+        y2 = np.clip(cy + cut_h // 2, 0, H)
+        
+        # 混合图像
+        images[:, :, y1:y2, x1:x2] = images[index, :, y1:y2, x1:x2]
+        
+        # 混合标签
+        lam = 1 - (x2 - x1) * (y2 - y1) / (W * H)
+        labels_onehot = F.one_hot(labels, num_classes=NUM_CLASSES).float()
+        mixed_labels = lam * labels_onehot + (1 - lam) * labels_onehot[index]
+        
+        return images, mixed_labels
+
+# --- 增强的长期训练函数（支持 MixUp） ---
+def train_model_enhanced(model, train_loader, val_loader, criterion, optimizer, scheduler, num_epochs, use_mixup=True):
+    """
+    增强版训练函数：
+    - 支持 MixUp / CutMix 数据增强
+    - 移除早停限制
+    - 每个epoch都保存最佳模型
+    - 使用ReduceLROnPlateau在损失停滞时调整学习率
+    """
+    # 初始化 MixUp
+    mixup = MixUp(alpha=0.4) if use_mixup else None
+    
     train_losses = []
     val_losses = []
     train_accuracies = []
     val_accuracies = []
     best_val_acc = 0.0
-    early_stop_counter = 0
     best_epoch = 0
+    patience_counter = 0
+    patience = 7  # 用于学习率调度的patience
+    best_loss = float('inf')
     
     for epoch in range(num_epochs):
         print(f'\nEpoch {epoch+1}/{num_epochs}')
-        print('-' * 40)
+        print('-' * 50)
         
         # 训练阶段
         model.train()
@@ -174,9 +407,17 @@ def train_model_with_early_stopping(model, train_loader, val_loader, criterion, 
         for images, labels in train_bar:
             images, labels = images.to(DEVICE), labels.to(DEVICE)
             
-            optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, labels)
+            # MixUp 增强
+            if mixup is not None:
+                images, labels_mixed = mixup(images, labels)
+                # 对于 MixUp，使用软标签计算损失
+                optimizer.zero_grad()
+                outputs = model(images)
+                loss = criterion(outputs, labels_mixed)
+            else:
+                optimizer.zero_grad()
+                outputs = model(images)
+                loss = criterion(outputs, labels)
             
             loss.backward()
             
@@ -186,9 +427,18 @@ def train_model_with_early_stopping(model, train_loader, val_loader, criterion, 
             optimizer.step()
             
             running_loss += loss.item()
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+            
+            # 计算准确率（使用硬标签）
+            if mixup is not None:
+                # MixUp 标签是软标签，需要转回硬标签
+                _, hard_labels = torch.max(labels_mixed, 1)
+                _, predicted = torch.max(outputs.data, 1)
+                correct += (predicted == hard_labels).sum().item()
+                total += labels.size(0)
+            else:
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
             
             train_bar.set_postfix({
                 'Loss': f'{loss.item():.4f}',
@@ -229,57 +479,96 @@ def train_model_with_early_stopping(model, train_loader, val_loader, criterion, 
         val_accuracies.append(val_acc)
         
         # 学习率调度
-        if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
-            scheduler.step(val_loss)
-        else:
-            scheduler.step()
+        scheduler.step(val_loss)
+        current_lr = optimizer.param_groups[0]["lr"]
         
         print(f'训练损失: {train_loss:.4f}, 训练准确率: {train_acc:.2f}%')
         print(f'验证损失: {val_loss:.4f}, 验证准确率: {val_acc:.2f}%')
-        print(f'当前学习率: {optimizer.param_groups[0]["lr"]:.2e}')
+        print(f'当前学习率: {current_lr:.2e}')
         
         # 过拟合检测
         overfitting_gap = train_acc - val_acc
         if overfitting_gap > 15:
             print(f'⚠️  过拟合警告：差距 {overfitting_gap:.2f}%')
         
-        # 早停逻辑
+        # 每个epoch都保存最佳模型
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             best_epoch = epoch + 1
             torch.save(model.state_dict(), MODEL_SAVE_PATH)
             print(f'✅ 保存最佳模型，验证准确率: {best_val_acc:.2f}%')
-            early_stop_counter = 0
+            patience_counter = 0
         else:
-            early_stop_counter += 1
-            
-        # 严重过拟合时提前终止
-        if overfitting_gap > 30:
-            print(f'🚫 严重过拟合，提前终止训练！')
-            break
-            
-        if early_stop_counter >= patience:
-            print(f'⏹️  早停触发！')
-            break
+            patience_counter += 1
+        
+        # 学习率调度：如果损失不再下降，降低学习率
+        if val_loss < best_loss:
+            best_loss = val_loss
+            patience_counter = 0
+        else:
+            if patience_counter >= patience:
+                # 降低学习率
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = max(param_group['lr'] * 0.5, 1e-7)
+                print(f'📉 降低学习率至: {optimizer.param_groups[0]["lr"]:.2e}')
+                patience_counter = 0
+        
+        # 如果学习率降到最低，保存最终模型
+        if current_lr <= 1e-7 and epoch > num_epochs - 5:
+            torch.save(model.state_dict(), f"final_model_epoch_{epoch+1}.pth")
+            print(f'💾 保存最终模型 (epoch {epoch+1})')
     
+    print(f'\n🏆 最佳验证准确率: {best_val_acc:.2f}% (Epoch {best_epoch})')
     return train_losses, val_losses, train_accuracies, val_accuracies
 
-# --- TTA评估 ---
-def evaluate_model_with_tta(model, test_loader, num_tta=3):
+# --- TTA评估（增强版） ---
+def evaluate_model_with_tta(model, test_loader, num_tta=5):
+    """
+    增强版测试时数据评估：
+    - 使用多种变换组合
+    - 对预测结果进行软投票
+    """
     model.eval()
     all_predictions = []
     all_labels = []
     
-    # TTA变换
+    # TTA变换组合（更多样化）
     tta_transforms = [
+        # 原始
         A.Compose([
             A.Resize(IMG_SIZE, IMG_SIZE),
-            A.HorizontalFlip(p=1.0 if i == 1 else 0.0),
-            A.Rotate(limit=5 if i == 2 else 0, p=1.0 if i == 2 else 0.0),
             A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ToTensorV2(),
-        ]) for i in range(num_tta)
-    ]
+        ]),
+        # 水平翻转
+        A.Compose([
+            A.Resize(IMG_SIZE, IMG_SIZE),
+            A.HorizontalFlip(p=1.0),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ToTensorV2(),
+        ]),
+        # 小角度旋转
+        A.Compose([
+            A.Resize(IMG_SIZE, IMG_SIZE),
+            A.Rotate(limit=10, p=1.0),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ToTensorV2(),
+        ]),
+        # 垂直翻转
+        A.Compose([
+            A.Resize(IMG_SIZE, IMG_SIZE),
+            A.VerticalFlip(p=1.0),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ToTensorV2(),
+        ]),
+        # 亮度调整
+        A.Compose([
+            A.Resize(IMG_SIZE, IMG_SIZE),
+            A.RandomBrightnessContrast(brightness_limit=0.1, contrast_limit=0.1, p=1.0),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ToTensorV2(),
+        ]),
+    ][:num_tta]
     
     with torch.no_grad():
         test_bar = tqdm(test_loader, desc='测试中(TTA)')
@@ -287,6 +576,7 @@ def evaluate_model_with_tta(model, test_loader, num_tta=3):
             batch_predictions = []
             
             for img, label in zip(images, labels):
+                # 反标准化以便应用albumentations变换
                 img_np = img.permute(1, 2, 0).numpy()
                 img_np = (img_np * np.array([0.229, 0.224, 0.225]) + np.array([0.485, 0.456, 0.406]))
                 img_np = np.clip(img_np * 255, 0, 255).astype(np.uint8)
@@ -298,6 +588,7 @@ def evaluate_model_with_tta(model, test_loader, num_tta=3):
                     output = model(tta_img)
                     tta_outputs.append(F.softmax(output, dim=1))
                 
+                # 软投票：平均概率后取最大
                 avg_output = torch.mean(torch.cat(tta_outputs, dim=0), dim=0)
                 predicted = torch.argmax(avg_output).cpu().numpy()
                 batch_predictions.append(predicted)
@@ -343,22 +634,28 @@ def main():
     
     # 创建模型
     print("正在初始化模型...")
-    model = ImprovedResNetDR(num_classes=NUM_CLASSES, pretrained=True, dropout_rate=0.7)
+    model = ImprovedResNetDR(num_classes=NUM_CLASSES, pretrained=True, dropout_rate=0.6)
     model = model.to(DEVICE)
     
-    # 使用混合损失
-    criterion = MixedLoss(alpha=0.7, class_weights=class_weights)
+    # 使用混合损失（带 Label Smoothing）
+    criterion = MixedLoss(alpha=0.7, class_weights=class_weights, label_smoothing=0.15)
     
-    # 使用AdamW优化器
-    optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-2)
+    # 使用分层学习率 + AdamW优化器（增强正则化）
+    optimizer = optim.AdamW(model.get_layer_groups(), lr=LEARNING_RATE, weight_decay=2e-2)
     
-    # 学习率调度器
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS, eta_min=1e-7)
+    # 学习率调度：ReduceLROnPlateau（损失停滞时降低学习率）
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=5, verbose=True
+    )
     
-    # 训练模型
-    print("开始训练...")
-    train_losses, val_losses, train_accuracies, val_accuracies = train_model_with_early_stopping(
-        model, train_loader, val_loader, criterion, optimizer, scheduler, NUM_EPOCHS, patience=3
+    # 增强训练（支持 MixUp）
+    print("=" * 60)
+    print("开始增强训练...")
+    print("特性: Label Smoothing + MixUp + 增强正则化")
+    print("=" * 60)
+    train_losses, val_losses, train_accuracies, val_accuracies = train_model_enhanced(
+        model, train_loader, val_loader, criterion, optimizer, scheduler, 
+        NUM_EPOCHS, use_mixup=True
     )
     
     # 绘制训练历史
@@ -369,7 +666,7 @@ def main():
     model.load_state_dict(torch.load(MODEL_SAVE_PATH))
     
     # 使用TTA评估模型
-    test_accuracy, predictions, true_labels, report = evaluate_model_with_tta(model, test_loader, num_tta=3)
+    test_accuracy, predictions, true_labels, report = evaluate_model_with_tta(model, test_loader, num_tta=5)
     
     print(f"\n🎯 测试准确率 (TTA): {test_accuracy:.4f}")
     print("\n分类报告:")
@@ -384,7 +681,7 @@ def main():
     # 绘制混淆矩阵
     plot_confusion_matrix(true_labels, predictions)
     
-    print("改进训练完成！")
+    print("增强训练完成！")
 
 def plot_training_history(train_losses, val_losses, train_accuracies, val_accuracies):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))

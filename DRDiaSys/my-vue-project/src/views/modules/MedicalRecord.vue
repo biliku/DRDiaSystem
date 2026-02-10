@@ -64,6 +64,10 @@
               <el-select v-model="selectedCase.status" size="small" @change="updateCaseStatus">
                 <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
               </el-select>
+              <el-button type="success" size="small" @click="openPatientInfoDialog">
+                <el-icon><User /></el-icon>
+                患者信息
+              </el-button>
               <el-button type="primary" size="small" @click="openEventDialog">
                 <el-icon><Edit /></el-icon>
                 新增记录
@@ -180,7 +184,7 @@
     >
       <el-form :model="eventForm" label-width="90px">
         <el-form-item label="事件类型">
-          <el-select v-box v-model="eventForm.event_type">
+          <el-select v-model="eventForm.event_type">
             <el-option v-for="item in eventTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
@@ -216,6 +220,99 @@
         <el-button type="primary" :loading="eventSubmitting" @click="submitEvent">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 患者信息对话框 -->
+    <el-dialog
+      v-model="patientInfoDialogVisible"
+      :title="`患者信息 - ${selectedCase?.patient_name || ''}`"
+      width="800px"
+      top="5vh"
+    >
+      <div v-loading="patientInfoLoading">
+        <el-tabs v-model="patientInfoActiveTab">
+          <!-- 基本信息 -->
+          <el-tab-pane label="基本信息" name="basic">
+            <el-descriptions :column="2" border v-if="patientInfoData?.patient_info">
+              <el-descriptions-item label="姓名">{{ patientInfoData.patient_info.real_name || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="性别">{{ getGenderLabel(patientInfoData.patient_info.gender) }}</el-descriptions-item>
+              <el-descriptions-item label="出生日期">{{ patientInfoData.patient_info.birth_date || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="年龄">{{ patientInfoData.patient_info.age || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="联系电话">{{ patientInfoData.patient_info.phone || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="邮箱">{{ patientInfoData.patient_info.email || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="血型">{{ getBloodTypeLabel(patientInfoData.patient_info.blood_type) }}</el-descriptions-item>
+              <el-descriptions-item label="紧急联系人">{{ patientInfoData.patient_info.emergency_contact || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="紧急电话">{{ patientInfoData.patient_info.emergency_phone || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="地址" :span="2">
+                {{ formatAddress(patientInfoData.patient_info) }}
+              </el-descriptions-item>
+            </el-descriptions>
+            <el-empty v-else description="暂无个人信息" :image-size="80" />
+          </el-tab-pane>
+
+          <!-- 病情信息 -->
+          <el-tab-pane label="病情信息" name="condition">
+            <div v-if="patientInfoData?.condition_info">
+              <el-descriptions :column="2" border>
+                <el-descriptions-item label="是否患有糖尿病">
+                  <el-tag :type="patientInfoData.condition_info.has_diabetes ? 'danger' : 'success'" size="small">
+                    {{ patientInfoData.condition_info.has_diabetes ? '是' : '否' }}
+                  </el-tag>
+                </el-descriptions-item>
+                <el-descriptions-item label="糖尿病类型">
+                  {{ getDiabetesTypeLabel(patientInfoData.condition_info.diabetes_type) }}
+                </el-descriptions-item>
+                <el-descriptions-item label="糖尿病病程">
+                  {{ patientInfoData.condition_info.diabetes_duration ? `${patientInfoData.condition_info.diabetes_duration} 年` : '-' }}
+                </el-descriptions-item>
+                <el-descriptions-item label="血糖水平">
+                  {{ patientInfoData.condition_info.blood_sugar_level ? `${patientInfoData.condition_info.blood_sugar_level} mmol/L` : '-' }}
+                </el-descriptions-item>
+                <el-descriptions-item label="糖化血红蛋白">
+                  {{ patientInfoData.condition_info.hba1c ? `${patientInfoData.condition_info.hba1c}%` : '-' }}
+                </el-descriptions-item>
+              </el-descriptions>
+
+              <el-divider content-position="left">症状信息</el-divider>
+              <el-descriptions :column="1" border size="small">
+                <el-descriptions-item label="症状列表">
+                  <el-tag
+                    v-for="symptom in patientInfoData.condition_info.symptoms"
+                    :key="symptom"
+                    type="warning"
+                    size="small"
+                    style="margin-right: 5px; margin-bottom: 5px;"
+                  >
+                    {{ getSymptomLabel(symptom) }}
+                  </el-tag>
+                  <span v-if="!patientInfoData.condition_info.symptoms?.length">无</span>
+                </el-descriptions-item>
+                <el-descriptions-item label="症状描述">{{ patientInfoData.condition_info.symptom_description || '无' }}</el-descriptions-item>
+                <el-descriptions-item label="症状持续时间">{{ patientInfoData.condition_info.symptom_duration || '未知' }}</el-descriptions-item>
+              </el-descriptions>
+
+              <el-divider content-position="left">病史信息</el-divider>
+              <el-descriptions :column="1" border size="small">
+                <el-descriptions-item label="既往病史">{{ patientInfoData.condition_info.medical_history || '无' }}</el-descriptions-item>
+                <el-descriptions-item label="家族病史">{{ patientInfoData.condition_info.family_history || '无' }}</el-descriptions-item>
+                <el-descriptions-item label="用药史">{{ patientInfoData.condition_info.medication_history || '无' }}</el-descriptions-item>
+                <el-descriptions-item label="过敏史">
+                  <el-tag v-if="patientInfoData.condition_info.allergy_history" type="danger" size="small">
+                    {{ patientInfoData.condition_info.allergy_history }}
+                  </el-tag>
+                  <span v-else>无</span>
+                </el-descriptions-item>
+                <el-descriptions-item label="其他疾病">{{ patientInfoData.condition_info.other_conditions || '无' }}</el-descriptions-item>
+                <el-descriptions-item label="备注">{{ patientInfoData.condition_info.notes || '无' }}</el-descriptions-item>
+              </el-descriptions>
+            </div>
+            <el-empty v-else description="暂无病情信息" :image-size="80" />
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+      <template #footer>
+        <el-button @click="patientInfoDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 
   <el-result
@@ -229,7 +326,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Plus, Edit } from '@element-plus/icons-vue'
+import { Search, Plus, Edit, User } from '@element-plus/icons-vue'
 import api from '../../api'
 
 const userRole = ref(localStorage.getItem('userRole') || 'doctor')
@@ -260,11 +357,16 @@ const eventForm = ref({
   next_followup_date: ''
 })
 
+// 患者信息相关
+const patientInfoDialogVisible = ref(false)
+const patientInfoLoading = ref(false)
+const patientInfoActiveTab = ref('basic')
+const patientInfoData = ref(null)
+
 const eventTypeOptions = [
   { label: 'AI诊断报告', value: 'ai_report' },
   { label: '医生记录', value: 'doctor_note' },
-  { label: '随访计划', value: 'follow_up' },
-  { label: '治疗方案', value: 'treatment' }
+  { label: '随访计划', value: 'follow_up' }
 ]
 
 const statusOptions = [
@@ -456,6 +558,77 @@ const previewPrimaryReport = () => {
   }
 }
 
+// 获取患者信息
+const openPatientInfoDialog = async () => {
+  if (!selectedCase.value?.patient) {
+    ElMessage.warning('无法获取患者ID')
+    return
+  }
+  patientInfoDialogVisible.value = true
+  patientInfoActiveTab.value = 'basic'
+  patientInfoData.value = null
+  patientInfoLoading.value = true
+
+  try {
+    const { data } = await api.get(`/api/patient/${selectedCase.value.patient}/medical-info/`)
+    patientInfoData.value = data
+  } catch (error) {
+    console.error('获取患者信息失败', error)
+    ElMessage.error(error.response?.data?.message || '获取患者信息失败')
+  } finally {
+    patientInfoLoading.value = false
+  }
+}
+
+const getGenderLabel = (gender) => {
+  const map = { 'M': '男', 'F': '女', 'O': '其他' }
+  return map[gender] || '-'
+}
+
+const getBloodTypeLabel = (bloodType) => {
+  const map = {
+    'A': 'A型',
+    'B': 'B型',
+    'AB': 'AB型',
+    'O': 'O型',
+    'UNKNOWN': '未知'
+  }
+  return map[bloodType] || '-'
+}
+
+const getDiabetesTypeLabel = (type) => {
+  const map = {
+    'TYPE1': '1型糖尿病',
+    'TYPE2': '2型糖尿病',
+    'GESTATIONAL': '妊娠期糖尿病',
+    'OTHER': '其他类型',
+    'NONE': '无糖尿病'
+  }
+  return map[type] || '-'
+}
+
+const getSymptomLabel = (symptom) => {
+  const map = {
+    'BLURRED_VISION': '视力模糊',
+    'FLOATERS': '飞蚊症',
+    'DARK_SPOTS': '暗点',
+    'POOR_NIGHT_VISION': '夜视能力差',
+    'COLOR_VISION_LOSS': '色觉减退',
+    'NONE': '无明显症状'
+  }
+  return map[symptom] || symptom
+}
+
+const formatAddress = (info) => {
+  if (!info) return '-'
+  const parts = []
+  if (info.province) parts.push(info.province)
+  if (info.city) parts.push(info.city)
+  if (info.district) parts.push(info.district)
+  if (info.address) parts.push(info.address)
+  return parts.length ? parts.join(' ') : '-'
+}
+
 const statusLabel = (status) => {
   const map = {
     active: '进行中',
@@ -485,6 +658,7 @@ const timelineType = (type) => {
 }
 
 const eventTypeLabel = (type) => {
+  if (type === 'treatment') return '治疗方案'
   const option = eventTypeOptions.find(item => item.value === type)
   return option ? option.label : type
 }
@@ -560,6 +734,11 @@ onMounted(() => {
   align-items: center;
 }
 
+.detail-actions .el-select,
+.detail-actions .el-button {
+  margin: 0;
+}
+
 .case-summary {
   margin-bottom: 24px;
 }
@@ -587,6 +766,10 @@ onMounted(() => {
 
 .medical-record-page :deep(.el-table__row.is-selected) {
   background-color: #ecf5ff;
+}
+
+.patient-info-tabs {
+  margin-top: 10px;
 }
 </style>
 

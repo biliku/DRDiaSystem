@@ -201,15 +201,19 @@ class DiagnosisReportGenerator:
             table_data = [['病灶类型', '占比(%)', '像素数量']]
             detail_rows = []
             for class_id, stat in lesion_stats.items():
+                # 跳过背景 (class_id == 0)
                 if class_id == 0:
+                    continue
+                # 跳过占比为0的病灶类型
+                if stat.get('percentage', 0) == 0:
                     continue
                 detail_rows.append({
                     'name': stat.get('name', ''),
                     'percentage': stat.get('percentage', 0),
                     'pixels': stat.get('pixel_count', 0)
                 })
+            # 按占比从高到低排序，显示所有检测到的病灶
             detail_rows.sort(key=lambda x: x['percentage'], reverse=True)
-            detail_rows = detail_rows[:3] or detail_rows
             for row in detail_rows:
                 table_data.append([
                     row['name'],

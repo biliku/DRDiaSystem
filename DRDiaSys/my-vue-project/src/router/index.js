@@ -9,8 +9,8 @@ import ConditionInfo from '../views/modules/ConditionInfo.vue'
 import EyeImageView from '../views/modules/EyeImageView.vue'
 import ReportView from '../views/modules/ReportView.vue'
 import MedicalRecord from '../views/modules/MedicalRecord.vue'
-import TreatmentPlan from '../views/modules/TreatmentPlan.vue'
-import PatientTreatmentPlan from '../views/modules/PatientTreatmentPlan.vue'
+import DoctorPlan from '../views/modules/treatment/DoctorPlan.vue'
+import PatientPlan from '../views/modules/treatment/PatientPlan.vue'
 import DoctorPatientChat from '../views/modules/DoctorPatientChat.vue'
 
 const routes = [
@@ -71,12 +71,12 @@ const routes = [
       {
         path: '/treatment-plan',
         name: 'TreatmentPlan',
-        component: TreatmentPlan
+        component: DoctorPlan
       },
       {
         path: '/patient-treatment-plan',
         name: 'PatientTreatmentPlan',
-        component: PatientTreatmentPlan
+        component: PatientPlan
       },
       {
         path: '/doctor-patient-chat',

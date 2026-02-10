@@ -2,13 +2,11 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    # 治疗方案推荐
-    path('recommend/', views.treatment_recommend, name='treatment_recommend'),
-    
     # 治疗方案管理
     path('plans/', views.treatment_plans, name='treatment_plans'),
     path('plans/<int:plan_id>/', views.treatment_plan_detail, name='treatment_plan_detail'),
     path('plans/<int:plan_id>/confirm/', views.confirm_treatment_plan, name='confirm_treatment_plan'),
+    path('plans/<int:plan_id>/complete/', views.complete_treatment_plan, name='complete_treatment_plan'),
     path('plans/<int:plan_id>/executions/', views.treatment_plan_executions, name='treatment_plan_executions'),
     
     # 治疗方案模板管理

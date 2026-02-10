@@ -27,7 +27,7 @@ from .serializers import (
     MessageSerializer,
     MessageTemplateSerializer
 )
-from .recommendation_service import recommend_treatment_plans, create_plan_from_template
+# AI 推荐服务已移除
 from diagnosis.models import CaseRecord, DiagnosisReport
 from users.models import UserProfile
 
@@ -38,61 +38,12 @@ def _is_doctor(user):
     return getattr(profile, 'role', None) == 'doctor'
 
 
+# ==================== 治疗方案推荐（已移除） ====================
+
 def _is_admin(user):
     """检查用户是否为管理员"""
     profile = getattr(user, 'profile', None)
     return getattr(profile, 'role', None) == 'admin'
-
-
-# ==================== 治疗方案推荐 ====================
-
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def treatment_recommend(request):
-    """获取或生成治疗方案推荐"""
-    if not _is_doctor(request.user):
-        return Response({'message': '仅医生可获取治疗方案推荐'}, status=status.HTTP_403_FORBIDDEN)
-    
-    if request.method == 'GET':
-        case_id = request.GET.get('case_id')
-        report_id = request.GET.get('report_id')
-        
-        if not case_id:
-            return Response({'message': '请提供病例ID'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        case = get_object_or_404(CaseRecord, id=case_id)
-        report = None
-        if report_id:
-            report = get_object_or_404(DiagnosisReport, id=report_id)
-        
-        recommendations = recommend_treatment_plans(case, report)
-        return Response({
-            'recommendations': recommendations,
-            'case_id': case_id,
-            'report_id': report_id
-        })
-    
-    elif request.method == 'POST':
-        # 生成推荐并创建方案
-        case_id = request.data.get('case_id')
-        template_id = request.data.get('template_id')
-        report_id = request.data.get('report_id')
-        title = request.data.get('title')
-        
-        if not case_id or not template_id:
-            return Response({'message': '请提供病例ID和模板ID'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        case = get_object_or_404(CaseRecord, id=case_id)
-        template = get_object_or_404(TreatmentPlanTemplate, id=template_id)
-        report = None
-        if report_id:
-            report = get_object_or_404(DiagnosisReport, id=report_id)
-        
-        plan = create_plan_from_template(template, case, report, request.user, title)
-        serializer = TreatmentPlanSerializer(plan)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-
 # ==================== 治疗方案管理 ====================
 
 @api_view(['GET', 'POST'])
@@ -205,6 +156,40 @@ def confirm_treatment_plan(request, plan_id):
     return Response(serializer.data)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def complete_treatment_plan(request, plan_id):
+    """完成治疗方案"""
+    if not _is_doctor(request.user):
+        return Response({'message': '仅医生可完成治疗方案'}, status=status.HTTP_403_FORBIDDEN)
+    
+    plan = get_object_or_404(TreatmentPlan, id=plan_id)
+    
+    # 只能完成执行中的方案
+    if plan.status != 'active':
+        return Response({'message': '只能完成执行中的方案'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    plan.status = 'completed'
+    plan.save()
+    
+    # 更新会话未读数（通知患者）
+    try:
+        conversation = Conversation.objects.get(
+            patient=plan.case.patient,
+            doctor=request.user
+        )
+        conversation.patient_unread_count += 1
+        conversation.last_message = f"治疗方案 {plan.plan_number} 已完成"
+        conversation.last_message_at = timezone.now()
+        conversation.last_message_by = request.user
+        conversation.save()
+    except Conversation.DoesNotExist:
+        pass
+    
+    serializer = TreatmentPlanSerializer(plan)
+    return Response(serializer.data)
+
+
 # ==================== 方案执行记录 ====================
 
 @api_view(['GET', 'POST'])
@@ -227,8 +212,20 @@ def treatment_plan_executions(request, plan_id):
         serializer = TreatmentPlanExecutionSerializer(data=request.data)
         if serializer.is_valid():
             execution = serializer.save(plan=plan, created_by=request.user)
+            
+            # 如果方案状态是"已确认"，自动变为"执行中"
+            if plan.status == 'confirmed':
+                plan.status = 'active'
+                plan.save()
+            
             return Response(TreatmentPlanExecutionSerializer(execution).data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # 打印错误以便调试
+            try:
+                print("TreatmentPlanExecutionSerializer errors:", serializer.errors)
+            except Exception:
+                pass
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ==================== 治疗方案模板管理 ====================
@@ -533,6 +530,27 @@ def upload_message_file(request, conversation_id):
     
     file = request.FILES['file']
     file_type = request.data.get('file_type', 'file')  # 'image' or 'file'
+    
+    # 验证文件类型和大小
+    max_size = 10 * 1024 * 1024  # 10 MB
+    if file.size > max_size:
+        return Response({'message': '文件过大，最大支持 10MB'}, status=status.HTTP_400_BAD_REQUEST)
+
+    _, ext = os.path.splitext(file.name)
+    ext = ext.lower()
+    allowed_image_mimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp']
+    allowed_file_exts = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.zip', '.rar', '.csv']
+
+    if file_type == 'image':
+        # 检查 MIME 类型 and extension
+        if not (file.content_type in allowed_image_mimes or file.content_type.startswith('image/')):
+            return Response({'message': '不支持的图片格式'}, status=status.HTTP_400_BAD_REQUEST)
+        if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']:
+            return Response({'message': '不支持的图片后缀'}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        # 普通文件
+        if ext not in allowed_file_exts:
+            return Response({'message': '不支持的文件类型'}, status=status.HTTP_400_BAD_REQUEST)
     
     # 保存文件
     upload_dir = os.path.join(settings.MEDIA_ROOT, 'conversations', str(conversation_id))

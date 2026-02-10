@@ -568,3 +568,55 @@ def condition_info_detail(request, condition_id):
     elif request.method == 'DELETE':
         condition.delete()
         return Response({'message': '病情信息已删除'}, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def patient_medical_info(request, patient_id):
+    """获取指定患者的个人信息和病情信息（医生端使用）"""
+    user = request.user
+
+    # 检查用户角色（医生或管理员）
+    if not _is_doctor(user) and not _is_admin(user):
+        return Response(
+            {'message': '只有医生或管理员可以访问此功能'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    try:
+        patient_user = User.objects.get(id=patient_id)
+
+        # 检查是否是患者账户
+        if not hasattr(patient_user, 'profile') or patient_user.profile.role != 'patient':
+            return Response(
+                {'message': '该用户不是患者账户'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 获取患者个人信息
+        try:
+            patient_info = PatientInfo.objects.get(user=patient_user)
+            patient_info_data = PatientInfoSerializer(patient_info).data
+        except PatientInfo.DoesNotExist:
+            patient_info_data = None
+
+        # 获取患者病情信息（最新的一条）
+        try:
+            latest_condition = ConditionInfo.objects.filter(user=patient_user).order_by('-created_at').first()
+            if latest_condition:
+                condition_data = ConditionInfoSerializer(latest_condition).data
+            else:
+                condition_data = None
+        except ConditionInfo.DoesNotExist:
+            condition_data = None
+
+        return Response({
+            'patient_info': patient_info_data,
+            'condition_info': condition_data
+        })
+
+    except User.DoesNotExist:
+        return Response(
+            {'message': '患者不存在'},
+            status=status.HTTP_404_NOT_FOUND
+        )
