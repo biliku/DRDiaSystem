@@ -119,6 +119,16 @@
                     查看PDF
                   </el-button>
                 </p>
+                <p v-if="event.related_plan" class="event-plan">
+                  方案编号：{{ event.related_plan.plan_number }}
+                  <el-button
+                    type="success"
+                    link
+                    @click="viewTreatmentPlan(event.related_plan.id)"
+                  >
+                    查看方案
+                  </el-button>
+                </p>
                 <p v-if="event.next_followup_date" class="event-follow">
                   下次随访：{{ event.next_followup_date }}
                 </p>
@@ -313,6 +323,121 @@
         <el-button @click="patientInfoDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 治疗方案查看对话框 -->
+    <el-dialog
+      v-model="treatmentPlanDialogVisible"
+      :title="`治疗方案详情 - ${treatmentPlanData?.plan_number || ''}`"
+      width="900px"
+      top="5vh"
+      destroy-on-close
+    >
+      <div v-loading="treatmentPlanLoading">
+        <div v-if="treatmentPlanData">
+          <!-- 基本信息 -->
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="方案编号">{{ treatmentPlanData.plan_number }}</el-descriptions-item>
+            <el-descriptions-item label="状态">
+              <el-tag :type="treatmentPlanData.status === 'completed' ? 'success' : treatmentPlanData.status === 'active' ? 'primary' : 'info'">
+                {{ treatmentPlanData.status === 'completed' ? '已完成' : treatmentPlanData.status === 'active' ? '执行中' : treatmentPlanData.status === 'confirmed' ? '已确认' : '草稿' }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="创建时间">{{ treatmentPlanData.created_at }}</el-descriptions-item>
+            <el-descriptions-item label="创建医生">{{ treatmentPlanData.created_by_name }}</el-descriptions-item>
+          </el-descriptions>
+
+          <!-- 血糖血压目标 -->
+          <div v-if="hasTargetData" class="plan-section">
+            <h4>血糖血压目标</h4>
+            <el-descriptions :column="2" border size="small">
+              <el-descriptions-item label="空腹血糖">
+                {{ formatBsTarget(treatmentPlanData.blood_sugar_target, 'fasting') }}
+              </el-descriptions-item>
+              <el-descriptions-item label="餐后血糖">
+                {{ formatBsTarget(treatmentPlanData.blood_sugar_target, 'postprandial') }}
+              </el-descriptions-item>
+              <el-descriptions-item label="糖化血红蛋白">
+                {{ formatBsTarget(treatmentPlanData.blood_sugar_target, 'hba1c') }}
+              </el-descriptions-item>
+              <el-descriptions-item label="血压">
+                {{ formatBpTarget(treatmentPlanData.blood_pressure_target) }}
+              </el-descriptions-item>
+            </el-descriptions>
+          </div>
+
+          <!-- 药物治疗 -->
+          <div v-if="treatmentPlanData.medications?.length" class="plan-section">
+            <h4>药物治疗</h4>
+            <el-table :data="treatmentPlanData.medications" size="small" border>
+              <el-table-column prop="category" label="类别" width="100">
+                <template #default="scope">
+                  <el-tag size="small">{{ getMedCategoryLabel(scope.row.category) }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="name" label="药物名称" width="120" />
+              <el-table-column label="给药方案" min-width="200">
+                <template #default="scope">
+                  {{ scope.row.route || '' }} {{ scope.row.dose || '' }} {{ scope.row.frequency || '' }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="duration" label="疗程" width="100" />
+            </el-table>
+          </div>
+
+          <!-- 眼科治疗 -->
+          <div v-if="treatmentPlanData.treatments?.length" class="plan-section">
+            <h4>眼科治疗</h4>
+            <el-table :data="treatmentPlanData.treatments" size="small" border>
+              <el-table-column label="类别" width="120">
+                <template #default="scope">
+                  <el-tag size="small">{{ getTreatmentCategoryLabel(scope.row.category) }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="item" label="具体项目" />
+              <el-table-column label="频次" width="100">
+                <template #default="scope">
+                  {{ scope.row.frequency }}{{ scope.row.frequency_unit }}
+                </template>
+              </el-table-column>
+              <el-table-column label="疗程" width="100">
+                <template #default="scope">
+                  {{ scope.row.course }}{{ scope.row.course_unit }}
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <!-- 生活方式指导 -->
+          <div v-if="treatmentPlanData.diet_guidance || treatmentPlanData.exercise_guidance" class="plan-section">
+            <h4>生活方式指导</h4>
+            <el-descriptions :column="1" border size="small">
+              <el-descriptions-item v-if="treatmentPlanData.diet_guidance" label="饮食指导">{{ treatmentPlanData.diet_guidance }}</el-descriptions-item>
+              <el-descriptions-item v-if="treatmentPlanData.exercise_guidance" label="运动指导">{{ treatmentPlanData.exercise_guidance }}</el-descriptions-item>
+            </el-descriptions>
+          </div>
+
+          <!-- 监测计划 -->
+          <div v-if="monitoringPlanData.length" class="plan-section">
+            <h4>监测计划</h4>
+            <el-table :data="monitoringPlanData" size="small" border>
+              <el-table-column prop="item" label="监测项目" />
+              <el-table-column prop="frequency" label="监测频率" width="150" />
+              <el-table-column prop="target" label="目标值" width="150" />
+            </el-table>
+          </div>
+
+          <!-- 警示症状 -->
+          <div v-if="treatmentPlanData.warning_symptoms" class="plan-section">
+            <h4>警示症状</h4>
+            <p>{{ treatmentPlanData.warning_symptoms }}</p>
+          </div>
+        </div>
+        <el-empty v-else description="暂无方案信息" :image-size="80" />
+      </div>
+      <template #footer>
+        <el-button @click="treatmentPlanDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 
   <el-result
@@ -363,10 +488,16 @@ const patientInfoLoading = ref(false)
 const patientInfoActiveTab = ref('basic')
 const patientInfoData = ref(null)
 
+// 治疗方案查看相关
+const treatmentPlanDialogVisible = ref(false)
+const treatmentPlanLoading = ref(false)
+const treatmentPlanData = ref(null)
+
 const eventTypeOptions = [
   { label: 'AI诊断报告', value: 'ai_report' },
   { label: '医生记录', value: 'doctor_note' },
-  { label: '随访计划', value: 'follow_up' }
+  { label: '随访计划', value: 'follow_up' },
+  { label: '治疗方案', value: 'treatment' }
 ]
 
 const statusOptions = [
@@ -386,6 +517,50 @@ const filteredCases = computed(() => {
     const matchStatus = filters.value.status === 'all' || item.status === filters.value.status
     return matchKeyword && matchStatus
   })
+})
+
+// 判断是否有血糖血压目标数据
+const hasTargetData = computed(() => {
+  if (!treatmentPlanData.value) return false
+  const bs = treatmentPlanData.value.blood_sugar_target
+  const bp = treatmentPlanData.value.blood_pressure_target
+  
+  // 检查血糖目标 - 兼容 min_max 格式和字符串格式
+  const hasBloodSugar = bs && (
+    // 新格式：{fasting_min, fasting_max, ...}
+    (bs.fasting_min !== undefined || bs.fasting_max !== undefined) ||
+    (bs.postprandial_min !== undefined || bs.postprandial_max !== undefined) ||
+    (bs.hba1c_min !== undefined || bs.hba1c_max !== undefined) ||
+    // 旧格式：{fasting: 'xxx', ...}
+    (typeof bs === 'object' && (
+      (bs.fasting && typeof bs.fasting === 'string' && bs.fasting.trim()) ||
+      (bs.postprandial && typeof bs.postprandial === 'string' && bs.postprandial.trim()) ||
+      (bs.hba1c && typeof bs.hba1c === 'string' && bs.hba1c.trim())
+    ))
+  )
+  
+  // 检查血压目标
+  const hasBloodPressure = bp && (
+    // 新格式：{systolic_min, systolic_max, ...}
+    (bp.systolic_min !== undefined || bp.systolic_max !== undefined) ||
+    (bp.diastolic_min !== undefined || bp.diastolic_max !== undefined) ||
+    // 旧格式：{systolic: 'xxx', ...}
+    (typeof bp === 'object' && (
+      (bp.systolic && typeof bp.systolic === 'string' && bp.systolic.trim()) ||
+      (bp.diastolic && typeof bp.diastolic === 'string' && bp.diastolic.trim())
+    ))
+  )
+  
+  return hasBloodSugar || hasBloodPressure
+})
+
+// 处理监测计划数据
+const monitoringPlanData = computed(() => {
+  if (!treatmentPlanData.value) return []
+  const mp = treatmentPlanData.value.monitoring_plan
+  if (!mp) return []
+  if (Array.isArray(mp)) return mp.filter(item => item && item.item)
+  return []
 })
 
 const selectableReports = computed(() => {
@@ -558,6 +733,24 @@ const previewPrimaryReport = () => {
   }
 }
 
+// 查看治疗方案详情
+const viewTreatmentPlan = async (planId) => {
+  treatmentPlanDialogVisible.value = true
+  treatmentPlanLoading.value = true
+  treatmentPlanData.value = null
+
+  try {
+    const { data } = await api.get(`/api/treatment/plans/${planId}/`)
+    treatmentPlanData.value = data
+  } catch (error) {
+    console.error('获取治疗方案详情失败', error)
+    ElMessage.error(error.response?.data?.message || '获取治疗方案详情失败')
+    treatmentPlanDialogVisible.value = false
+  } finally {
+    treatmentPlanLoading.value = false
+  }
+}
+
 // 获取患者信息
 const openPatientInfoDialog = async () => {
   if (!selectedCase.value?.patient) {
@@ -594,6 +787,90 @@ const getBloodTypeLabel = (bloodType) => {
     'UNKNOWN': '未知'
   }
   return map[bloodType] || '-'
+}
+
+const getMedCategoryLabel = (category) => {
+  const map = {
+    'ophthalmic': '眼科用药',
+    'systemic': '全身用药',
+    'hypoglycemic': '降糖药',
+    'antihypertensive': '降压药',
+    'lipid_lowering': '降脂药',
+    'nutrient': '营养神经'
+  }
+  return map[category] || category || '-'
+}
+
+// 翻译治疗类别
+const getTreatmentCategoryLabel = (category) => {
+  const map = {
+    'anti_vegf': '抗VEGF',
+    'laser': '激光治疗',
+    'surgical': '手术治疗',
+    'other': '其他治疗'
+  }
+  return map[category] || category || '未知'
+}
+
+// 格式化血糖目标（兼容 min_max 格式和字符串格式）
+const formatBsTarget = (bs, field) => {
+  if (!bs) return '-'
+  // 新格式：{fasting_min, fasting_max, fasting_unit}
+  if (bs[`${field}_min`] !== undefined || bs[`${field}_max`] !== undefined) {
+    const min = bs[`${field}_min`]
+    const max = bs[`${field}_max`]
+    const unit = bs[`${field}_unit`] || ''
+    if (min && max) {
+      return `${min}-${max} ${unit}`
+    } else if (min) {
+      return `${min} ${unit}`
+    } else if (max) {
+      return `${max} ${unit}`
+    }
+    return '-'
+  }
+  // 旧格式：{fasting: '4.4-7.0 mmol/L'}
+  if (bs[field]) return bs[field]
+  return '-'
+}
+
+// 格式化血压目标
+const formatBpTarget = (bp) => {
+  if (!bp) return '-'
+  // 新格式：{systolic_min, systolic_max, systolic_unit, diastolic_min, diastolic_max, diastolic_unit}
+  if (bp.systolic_min !== undefined || bp.systolic_max !== undefined) {
+    const systolicUnit = bp.systolic_unit || 'mmHg'
+    const diastolicUnit = bp.diastolic_unit || 'mmHg'
+    
+    let result = ''
+    if (bp.systolic_min && bp.systolic_max) {
+      result += `${bp.systolic_min}-${bp.systolic_max} ${systolicUnit}`
+    } else if (bp.systolic_min) {
+      result += `${bp.systolic_min} ${systolicUnit}`
+    } else if (bp.systolic_max) {
+      result += `${bp.systolic_max} ${systolicUnit}`
+    }
+    
+    if (bp.diastolic_min !== undefined || bp.diastolic_max !== undefined) {
+      result += ' / '
+      if (bp.diastolic_min && bp.diastolic_max) {
+        result += `${bp.diastolic_min}-${bp.diastolic_max} ${diastolicUnit}`
+      } else if (bp.diastolic_min) {
+        result += `${bp.diastolic_min} ${diastolicUnit}`
+      } else if (bp.diastolic_max) {
+        result += `${bp.diastolic_max} ${diastolicUnit}`
+      }
+    }
+    return result
+  }
+  // 旧格式：{systolic: 'xxx', diastolic: 'xxx'}
+  if (typeof bp === 'object') {
+    if (bp.systolic && bp.diastolic) {
+      return `${bp.systolic} / ${bp.diastolic}`
+    }
+    return bp.systolic || bp.diastolic || '-'
+  }
+  return String(bp)
 }
 
 const getDiabetesTypeLabel = (type) => {
@@ -762,6 +1039,21 @@ onMounted(() => {
 
 .event-desc {
   font-size: 14px;
+}
+
+.event-plan {
+  color: var(--el-color-success);
+}
+
+.plan-section {
+  margin-top: 16px;
+}
+
+.plan-section h4 {
+  margin: 12px 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
 }
 
 .medical-record-page :deep(.el-table__row.is-selected) {

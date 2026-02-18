@@ -189,7 +189,11 @@
                 </template>
               </el-table-column>
               <el-table-column prop="name" label="药物名称" width="150" />
-              <el-table-column prop="dosage" label="用法用量" />
+              <el-table-column label="给药方案" min-width="200">
+                <template #default="scope">
+                  {{ scope.row.route || scope.row.dosage || '' }} {{ scope.row.dose || '' }} {{ scope.row.frequency || '' }}
+                </template>
+              </el-table-column>
               <el-table-column prop="duration" label="疗程" width="100" />
               <el-table-column prop="notes" label="备注" />
             </el-table>
@@ -268,7 +272,11 @@
             <h4><el-icon><FirstAidKit /></el-icon> 药物治疗</h4>
             <el-table :data="selectedPlan.medications" border stripe size="small">
               <el-table-column prop="name" label="药物名称" width="120" />
-              <el-table-column prop="dosage" label="用法用量" />
+              <el-table-column label="给药方案" min-width="180">
+                <template #default="scope">
+                  {{ scope.row.route || scope.row.dosage || '' }} {{ scope.row.dose || '' }} {{ scope.row.frequency || '' }}
+                </template>
+              </el-table-column>
               <el-table-column prop="duration" label="疗程" width="100" />
               <el-table-column prop="notes" label="备注" />
             </el-table>

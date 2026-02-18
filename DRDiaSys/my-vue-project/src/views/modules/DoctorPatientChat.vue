@@ -134,7 +134,7 @@
                       type="primary"
                       link
                       size="small"
-                      @click="downloadFile(msg.file_url, msg.file_name)"
+                      @click="downloadFile(msg)"
                     >
                       下载
                     </el-button>
@@ -486,16 +486,35 @@ export default {
         event.target.value = ''
       }
     },
-    downloadFile(fileUrl, fileName) {
-      const url = this.getFileUrl(fileUrl)
-      const link = document.createElement('a')
-      link.href = encodeURI(url)
-      link.download = fileName
-      // ensure new tab if browser blocks direct download
-      link.target = '_blank'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+    downloadFile(message) {
+      // 检查是否有文件
+      if (!message.file_url) {
+        ElMessage.warning('该消息没有附件')
+        return
+      }
+      
+      // 使用API代理下载文件，避免混合内容问题
+      api.get(`/api/treatment/messages/${message.id}/download/`, {
+        responseType: 'blob'
+      }).then(response => {
+        const url = window.URL.createObjectURL(new Blob([response.data]))
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute('download', message.file_name || 'download')
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.URL.revokeObjectURL(url)
+      }).catch(error => {
+        console.error('下载失败', error)
+        if (error.response?.status === 401) {
+          ElMessage.error('登录已过期，请重新登录')
+          // 可选：跳转到登录页
+          // window.location.href = '/login'
+        } else {
+          ElMessage.error(error.response?.data?.message || '下载失败')
+        }
+      })
     },
     getFileUrl(url) {
       if (!url) return ''

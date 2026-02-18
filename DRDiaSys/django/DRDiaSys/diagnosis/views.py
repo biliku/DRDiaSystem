@@ -453,7 +453,7 @@ def case_records(request):
             'patient',
             'primary_report__patient_image',
             'primary_report__diagnosis_task'
-        ).prefetch_related('events__related_report')
+        ).prefetch_related('events__related_report', 'events__related_plan')
 
         if patient_id:
             queryset = queryset.filter(patient_id=patient_id)
@@ -508,7 +508,7 @@ def case_record_detail(request, case_id):
             'patient',
             'primary_report__patient_image',
             'primary_report__diagnosis_task'
-        ).prefetch_related('events__related_report'),
+        ).prefetch_related('events__related_report', 'events__related_plan'),
         pk=case_id
     )
 

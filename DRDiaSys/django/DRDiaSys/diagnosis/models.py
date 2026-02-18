@@ -197,6 +197,14 @@ class CaseEvent(models.Model):
         related_name='case_events',
         verbose_name='关联报告'
     )
+    related_plan = models.ForeignKey(
+        'treatment.TreatmentPlan',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='case_events',
+        verbose_name='关联治疗方案'
+    )
     description = models.TextField(verbose_name='事件描述')
     next_followup_date = models.DateField(null=True, blank=True, verbose_name='下次随访时间')
     created_by = models.ForeignKey(

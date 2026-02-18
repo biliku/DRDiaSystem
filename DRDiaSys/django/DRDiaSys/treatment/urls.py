@@ -21,6 +21,10 @@ urlpatterns = [
     # 医患交流 - 消息管理
     path('conversations/<int:conversation_id>/messages/', views.messages, name='messages'),
     path('conversations/<int:conversation_id>/upload/', views.upload_message_file, name='upload_message_file'),
+    
+    # 消息文件下载（通过API代理，避免混合内容问题）- 必须放在 message_id/ 之前
+    path('messages/<int:message_id>/download/', views.download_message_file, name='download_message_file'),
+    
     path('messages/<int:message_id>/', views.message_detail, name='message_detail'),
     
     # 消息模板管理

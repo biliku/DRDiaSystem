@@ -10,6 +10,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from diagnosis.models import CaseRecord, CaseEvent
+
 from .models import (
     TreatmentPlan,
     TreatmentPlanExecution,
@@ -85,6 +87,22 @@ def treatment_plans(request):
             if not plan.plan_number:
                 plan.plan_number = plan.generate_plan_number()
                 plan.save()
+            
+            # 自动创建病历事件
+            try:
+                case = plan.case
+                # 检查是否已存在相同方案的事件
+                if case:
+                    CaseEvent.objects.create(
+                        case=case,
+                        event_type='treatment',
+                        description=f'创建治疗方案：{plan.title or plan.plan_number}',
+                        related_plan=plan,
+                        created_by=request.user
+                    )
+            except Exception as e:
+                print(f"自动创建病历事件失败: {e}")
+            
             return Response(TreatmentPlanSerializer(plan).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -512,6 +530,61 @@ def message_detail(request, message_id):
             return Response({'message': '只能删除自己发送的消息'}, status=status.HTTP_403_FORBIDDEN)
         message.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def download_message_file(request, message_id):
+    """下载消息文件（通过API代理，避免混合内容问题）"""
+    message = get_object_or_404(Message, id=message_id)
+    
+    # 权限检查
+    if not (_is_admin(request.user) or _is_doctor(request.user)):
+        if message.conversation.patient != request.user and message.sender != request.user:
+            return Response({'message': '无权访问该消息'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # 检查是否有文件
+    if not message.file_url:
+        return Response({'message': '该消息没有附件'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # 构建文件路径
+    file_path = message.file_url
+    if file_path.startswith('/'):
+        file_path = file_path[1:]
+    
+    full_path = os.path.join(settings.MEDIA_ROOT, file_path)
+    
+    # 检查文件是否存在
+    if not os.path.exists(full_path):
+        return Response({'message': '文件不存在'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # 获取文件名
+    file_name = message.file_name or os.path.basename(full_path)
+    
+    # 根据文件类型设置Content-Type
+    content_type = 'application/octet-stream'
+    if file_name.lower().endswith(('.pdf',)):
+        content_type = 'application/pdf'
+    elif file_name.lower().endswith(('.doc', '.docx')):
+        content_type = 'application/msword'
+    elif file_name.lower().endswith(('.xls', '.xlsx')):
+        content_type = 'application/vnd.ms-excel'
+    elif file_name.lower().endswith(('.jpg', '.jpeg')):
+        content_type = 'image/jpeg'
+    elif file_name.lower().endswith('.png'):
+        content_type = 'image/png'
+    elif file_name.lower().endswith('.gif'):
+        content_type = 'image/gif'
+    elif file_name.lower().endswith('.txt'):
+        content_type = 'text/plain'
+    
+    try:
+        with open(full_path, 'rb') as f:
+            response = HttpResponse(f.read(), content_type=content_type)
+            response['Content-Disposition'] = f'attachment; filename="{file_name}"'
+            return response
+    except Exception as e:
+        return Response({'message': f'读取文件失败: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])

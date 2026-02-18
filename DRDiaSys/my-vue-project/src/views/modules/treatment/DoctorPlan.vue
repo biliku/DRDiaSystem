@@ -326,7 +326,7 @@
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="药物名称" width="180">
+            <el-table-column label="药物名称" width="140">
               <template #default="scope">
                 <el-select
                   v-model="scope.row.name"
@@ -352,34 +352,73 @@
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="用法用量" min-width="160">
+            <el-table-column label="给药途径" width="100">
               <template #default="scope">
-                <el-input v-model="scope.row.dosage_value" placeholder="如：500" size="small" style="width: 70px" />
-                <el-select v-model="scope.row.dosage_unit" size="small" style="width: 65px; margin: 0 5px">
-                  <el-option label="mg" value="mg" />
-                  <el-option label="g" value="g" />
-                  <el-option label="ml" value="ml" />
-                  <el-option label="μg" value="μg" />
-                  <el-option label="片" value="片" />
-                  <el-option label="粒" value="粒" />
-                  <el-option label="支" value="支" />
-                  <el-option label="U" value="U" />
-                </el-select>
-                <el-input v-model="scope.row.dosage_frequency" placeholder="如：口服 tid" size="small" style="width: 80px" />
-              </template>
-            </el-table-column>
-            <el-table-column label="疗程" width="130">
-              <template #default="scope">
-                <el-input v-model="scope.row.duration_value" placeholder="如：3" size="small" style="width: 50px" />
-                <el-select v-model="scope.row.duration_unit" size="small" style="width: 70px; margin-left: 5px">
-                  <el-option label="天" value="天" />
-                  <el-option label="周" value="周" />
-                  <el-option label="月" value="月" />
-                  <el-option label="年" value="年" />
+                <el-select
+                  v-model="scope.row.route"
+                  placeholder="途径"
+                  size="small"
+                  style="width: 100%"
+                >
+                  <el-option label="口服" value="口服" />
+                  <el-option label="外用" value="外用" />
+                  <el-option label="滴眼" value="滴眼" />
+                  <el-option label="注射" value="注射" />
+                  <el-option label="舌下含服" value="舌下含服" />
+                  <el-option label="吸入" value="吸入" />
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="备注" width="120">
+            <el-table-column label="单次剂量" width="180">
+              <template #default="scope">
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <el-input-number v-model="scope.row.dose_value" :min="0" :precision="2" size="small" style="width: 90px" />
+                  <el-select v-model="scope.row.dose_unit" size="small" style="width: 70px">
+                    <el-option label="mg" value="mg" />
+                    <el-option label="g" value="g" />
+                    <el-option label="ml" value="ml" />
+                    <el-option label="μg" value="μg" />
+                    <el-option label="片" value="片" />
+                    <el-option label="粒" value="粒" />
+                    <el-option label="支" value="支" />
+                    <el-option label="U" value="U" />
+                    <el-option label="滴" value="滴" />
+                  </el-select>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="给药频次" width="100">
+              <template #default="scope">
+                <el-select
+                  v-model="scope.row.frequency"
+                  placeholder="频次"
+                  size="small"
+                  style="width: 100%"
+                >
+                  <el-option label="每日1次" value="每日1次" />
+                  <el-option label="每日2次" value="每日2次" />
+                  <el-option label="每日3次" value="每日3次" />
+                  <el-option label="每日4次" value="每日4次" />
+                  <el-option label="每晚1次" value="每晚1次" />
+                  <el-option label="必要时" value="必要时" />
+                  <el-option label="餐前" value="餐前" />
+                  <el-option label="餐后" value="餐后" />
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="疗程" width="160">
+              <template #default="scope">
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <el-input-number v-model="scope.row.duration_value" :min="0" size="small" style="width: 80px" />
+                  <el-select v-model="scope.row.duration_unit" size="small" style="width: 65px">
+                    <el-option label="天" value="天" />
+                    <el-option label="周" value="周" />
+                    <el-option label="月" value="月" />
+                  </el-select>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="备注" width="100">
               <template #default="scope">
                 <el-input v-model="scope.row.notes" placeholder="备注" size="small" />
               </template>
@@ -792,10 +831,11 @@ export default {
     addMedication() {
       this.planForm.medications.push({
         name: '',
-        dosage_value: '',
-        dosage_unit: 'mg',
-        dosage_frequency: '',
-        duration_value: '',
+        route: '口服',
+        dose_value: null,
+        dose_unit: 'mg',
+        frequency: '每日3次',
+        duration_value: null,
         duration_unit: '月',
         category: 'ophthalmic',
         notes: ''
@@ -849,11 +889,14 @@ export default {
           // 药物治疗
           medications: this.planForm.medications.map(m => ({
             name: m.name,
-            dosage: m.dosage_value ? `${m.dosage_value}${m.dosage_unit} ${m.dosage_frequency || ''}`.trim() : '',
-            dosage_value: m.dosage_value,
-            dosage_unit: m.dosage_unit,
-            dosage_frequency: m.dosage_frequency,
-            duration: m.duration_value ? `${m.duration_value}${m.duration_unit}` : '',
+            route: m.route || '口服',
+            // 合并给药途径和频次到 dosage 字段
+            dosage: m.route && m.frequency ? `${m.route} ${m.frequency}` : (m.route || ''),
+            dose: m.dose_value && m.dose_unit ? `${m.dose_value}${m.dose_unit}` : '',
+            dose_value: m.dose_value,
+            dose_unit: m.dose_unit,
+            frequency: m.frequency || '',
+            duration: m.duration_value && m.duration_unit ? `${m.duration_value}${m.duration_unit}` : '',
             duration_value: m.duration_value,
             duration_unit: m.duration_unit,
             category: m.category,
@@ -888,6 +931,7 @@ export default {
               event_type: 'treatment',
               description: `创建治疗方案：${res.data.title}（方案编号：${res.data.plan_number}）`,
               related_report_id: null,
+              related_plan_id: res.data.id,
               next_followup_date: null
             })
           } catch (eventError) {
@@ -940,35 +984,102 @@ export default {
         })),
         // 药物治疗
         medications: (plan.medications || []).map(m => {
-          // 尝试拆分已有的 dosage 字符串
-          let dosage_value = ''
-          let dosage_unit = 'mg'
-          let dosage_frequency = ''
-          if (m.dosage) {
-            const match = m.dosage.match(/^([\d.]+)?([^\d\s]+)?\s*(.*)$/)
+          // 解析给药途径和频次（旧数据格式兼容）
+          let route = '口服'
+          let frequency = '每日3次'
+          let dose_value = null
+          let dose_unit = 'mg'
+          
+          // 频次代码映射表（兼容旧数据）
+          const frequencyMap = {
+            'qd': '每日1次',
+            'bid': '每日2次',
+            'tid': '每日3次',
+            'qid': '每日4次',
+            'qn': '每晚1次',
+            'prn': '必要时',
+            'ac': '餐前',
+            'pc': '餐后'
+          }
+          
+          // 如果有新字段，直接使用
+          if (m.route) {
+            route = m.route
+          }
+          if (m.frequency) {
+            // 如果是旧代码，转换为中文
+            frequency = frequencyMap[m.frequency] || m.frequency
+          }
+          
+          // 解析剂量
+          if (m.dose) {
+            const match = m.dose.match(/^([\d.]+)?([^\d\s]*)?$/)
             if (match) {
-              dosage_value = match[1] || ''
-              dosage_unit = match[2] || 'mg'
-              dosage_frequency = match[3] || ''
+              dose_value = match[1] ? parseFloat(match[1]) : null
+              dose_unit = match[2] || 'mg'
             }
           }
-          // 尝试拆分已有的 duration 字符串
-          let duration_value = ''
+          
+          // 兼容旧数据：从 dosage 中解析
+          if (!m.route && m.dosage) {
+            const match = m.dosage.match(/^([^\d\s]+)?\s*([a-zA-Z]+)?$/)
+            if (match) {
+              if (match[1]) route = match[1].trim()
+              if (match[2]) {
+                const engFreq = match[2].trim()
+                frequency = frequencyMap[engFreq] || engFreq
+              }
+            }
+          }
+          
+          // 解析剂量（旧数据格式）
+          if (!m.dose && m.dosage_value) {
+            dose_value = m.dosage_value
+            dose_unit = m.dosage_unit || 'mg'
+          }
+          
+          // 兼容旧数据：从 dosage 中解析剂量数字
+          if (!m.dose && !m.dosage_value && m.dosage) {
+            const match = m.dosage.match(/^([\d.]+)?([^\d\s]+)?\s*(.*)$/)
+            if (match) {
+              dose_value = match[1] ? parseFloat(match[1]) : null
+              dose_unit = match[2] || 'mg'
+              // 如果第三个捕获组是频次代码
+              if (match[3] && !m.frequency && !m.dosage_frequency) {
+                const engFreq = match[3].trim()
+                frequency = frequencyMap[engFreq] || engFreq
+              }
+            }
+          }
+          
+          // 兼容旧数据
+          if (m.dosage_frequency) {
+            frequency = frequencyMap[m.dosage_frequency] || m.dosage_frequency
+          }
+          
+          // 解析疗程
+          let duration_value = null
           let duration_unit = '月'
           if (m.duration) {
-            const match = m.duration.match(/^([\d.]+)?([^\d\s]+)?$/)
+            const match = m.duration.match(/^([\d.]+)?([^\d\s]*)?$/)
             if (match) {
-              duration_value = match[1] || ''
+              duration_value = match[1] ? parseFloat(match[1]) : null
               duration_unit = match[2] || '月'
             }
           }
+          if (m.duration_value) {
+            duration_value = m.duration_value
+            duration_unit = m.duration_unit || '月'
+          }
+          
           return {
             name: m.name || '',
-            dosage_value: m.dosage_value || dosage_value,
-            dosage_unit: m.dosage_unit || dosage_unit || 'mg',
-            dosage_frequency: m.dosage_frequency || dosage_frequency,
-            duration_value: m.duration_value || duration_value,
-            duration_unit: m.duration_unit || duration_unit || '月',
+            route: route,
+            frequency: frequency,
+            dose_value: dose_value,
+            dose_unit: dose_unit,
+            duration_value: duration_value,
+            duration_unit: duration_unit,
             category: m.category || 'ophthalmic',
             notes: m.notes || ''
           }

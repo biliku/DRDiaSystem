@@ -48,7 +48,7 @@ class TreatmentPlanTemplate(models.Model):
     medications = models.JSONField(
         default=list,
         verbose_name='药物列表',
-        help_text='[{"name": "药物名称", "dosage": "用法用量", "duration": "疗程", "category": "类别", "notes": "备注"}]'
+        help_text='[{"name": "药物名称", "dosage": "用法用量", "frequency": "频次", "duration": "疗程", "category": "类别", "notes": "备注"}]'
     )
 
     # ========== 生活方式干预 ==========
@@ -162,7 +162,7 @@ class TreatmentPlan(models.Model):
     medications = models.JSONField(
         default=list,
         verbose_name='药物列表',
-        help_text='[{"name": "药物名称", "dosage": "用法用量", "duration": "疗程", "category": "类别", "notes": "备注"}]'
+        help_text='[{"name": "药物名称", "dosage": "用法用量", "frequency": "频次", "duration": "疗程", "category": "类别", "notes": "备注"}]'
     )
 
     # ========== 生活方式干预 ==========

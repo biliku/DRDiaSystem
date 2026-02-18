@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import DiagnosisTask, DiagnosisReport, CaseRecord, CaseEvent
 from datasets.serializers import PatientImageSerializer
+from treatment.models import TreatmentPlan
 
 
 class DiagnosisTaskSerializer(serializers.ModelSerializer):
@@ -82,11 +83,26 @@ class DiagnosisReportSerializer(serializers.ModelSerializer):
         ]
 
 
+class TreatmentPlanSimpleSerializer(serializers.ModelSerializer):
+    """简化的治疗方案序列化器，用于嵌套显示"""
+    class Meta:
+        model = TreatmentPlan
+        fields = ['id', 'plan_number', 'title', 'status', 'created_at']
+
+
 class CaseEventSerializer(serializers.ModelSerializer):
     related_report = DiagnosisReportSerializer(read_only=True)
     related_report_id = serializers.PrimaryKeyRelatedField(
         queryset=DiagnosisReport.objects.filter(status='finalized'),
         source='related_report',
+        write_only=True,
+        allow_null=True,
+        required=False
+    )
+    related_plan = TreatmentPlanSimpleSerializer(read_only=True)
+    related_plan_id = serializers.PrimaryKeyRelatedField(
+        queryset=TreatmentPlan.objects.all(),
+        source='related_plan',
         write_only=True,
         allow_null=True,
         required=False
@@ -101,12 +117,14 @@ class CaseEventSerializer(serializers.ModelSerializer):
             'description',
             'related_report',
             'related_report_id',
+            'related_plan',
+            'related_plan_id',
             'next_followup_date',
             'created_by',
             'created_by_name',
             'created_at',
         ]
-        read_only_fields = ['id', 'related_report', 'created_by', 'created_by_name', 'created_at']
+        read_only_fields = ['id', 'related_report', 'related_plan', 'created_by', 'created_by_name', 'created_at']
 
     def validate(self, attrs):
         case = self.context.get('case')
