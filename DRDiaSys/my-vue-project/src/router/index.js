@@ -3,7 +3,6 @@ import Login from '../views/Login.vue'
 import Layout from '../views/Layout.vue'
 import UserManagement from '../views/modules/UserManagement.vue'
 import ImageProcessing from '../views/modules/ImageProcessing.vue'
-import Dashboard from '../views/modules/Dashboard.vue'
 import PersonalInfo from '../views/modules/PersonalInfo.vue'
 import ConditionInfo from '../views/modules/ConditionInfo.vue'
 import EyeImageView from '../views/modules/EyeImageView.vue'
@@ -12,11 +11,14 @@ import MedicalRecord from '../views/modules/MedicalRecord.vue'
 import DoctorPlan from '../views/modules/treatment/DoctorPlan.vue'
 import PatientPlan from '../views/modules/treatment/PatientPlan.vue'
 import DoctorPatientChat from '../views/modules/DoctorPatientChat.vue'
+import DataStatistics from '../views/modules/DataStatistics.vue'
+import AIModelManagement from '../views/modules/AIModelManagement.vue'
+import ClinicalImage from '../views/modules/ClinicalImage.vue'
 
 const routes = [
   {
     path: '/',
-    redirect: '/dashboard'
+    redirect: '/image-processing'
   },
   {
     path: '/login',
@@ -39,11 +41,6 @@ const routes = [
         component: ImageProcessing
       },
       {
-        path: '/dashboard',
-        name: 'Dashboard',
-        component: Dashboard
-      },
-      {
         path: '/personal-info',
         name: 'PersonalInfo',
         component: PersonalInfo
@@ -64,6 +61,11 @@ const routes = [
         component: ReportView
       },
       {
+        path: '/clinical-image',
+        name: 'ClinicalImage',
+        component: ClinicalImage
+      },
+      {
         path: '/medical-record',
         name: 'MedicalRecord',
         component: MedicalRecord
@@ -82,6 +84,16 @@ const routes = [
         path: '/doctor-patient-chat',
         name: 'DoctorPatientChat',
         component: DoctorPatientChat
+      },
+      {
+        path: '/data-statistics',
+        name: 'DataStatistics',
+        component: DataStatistics
+      },
+      {
+        path: '/ai-model-management',
+        name: 'AIModelManagement',
+        component: AIModelManagement
       }
       // 其他子路由可以在这里添加
     ]
@@ -100,7 +112,7 @@ router.beforeEach((to, from, next) => {
     // 如果已经登录，跳转到首页
     const token = localStorage.getItem('token')
     if (token) {
-      next('/dashboard')
+      next('/image-processing')
     } else {
     next()
     }

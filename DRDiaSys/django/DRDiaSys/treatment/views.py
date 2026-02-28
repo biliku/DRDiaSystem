@@ -710,7 +710,93 @@ def message_template_detail(request, template_id):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     elif request.method == 'DELETE':
         template.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ==================== 治疗统计 ====================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def treatment_statistics(request):
+    """获取治疗相关统计数据"""
+    from django.db.models import Count, Q
+    from django.utils import timezone
+    from datetime import timedelta
+
+    # 治疗方案统计
+    plan_stats = TreatmentPlan.objects.aggregate(
+        total=Count('id'),
+        pending=Count('id', filter=Q(status='pending')),
+        in_progress=Count('id', filter=Q(status='in_progress')),
+        completed=Count('id', filter=Q(status='completed')),
+        cancelled=Count('id', filter=Q(status='cancelled'))
+    )
+
+    # AI推荐统计
+    ai_recommended = TreatmentPlan.objects.filter(is_ai_recommended=True).count()
+    doctor_created = TreatmentPlan.objects.filter(is_ai_recommended=False).count()
+
+    # 方案执行统计
+    execution_stats = TreatmentPlanExecution.objects.aggregate(
+        total=Count('id'),
+        follow_ups_completed=Count('id', filter=Q(follow_up_completed=True))
+    )
+
+    # 医患会话统计
+    conversation_stats = Conversation.objects.aggregate(
+        total=Count('id'),
+        active=Count('id', filter=Q(is_active=True))
+    )
+
+    # 消息统计
+    message_stats = Message.objects.aggregate(
+        total=Count('id'),
+        unread_patient=Sum('conversation__patient_unread_count'),
+        unread_doctor=Sum('conversation__doctor_unread_count')
+    )
+
+    # 消息模板统计
+    template_stats = MessageTemplate.objects.aggregate(
+        total=Count('id'),
+        public=Count('id', filter=Q(is_public=True))
+    )
+
+    # 最近7天治疗方案趋势
+    seven_days_ago = timezone.now() - timedelta(days=7)
+    daily_plans = []
+    for i in range(7):
+        day = seven_days_ago + timedelta(days=i)
+        day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1)
+        count = TreatmentPlan.objects.filter(created_at__gte=day_start, created_at__lt=day_end).count()
+        daily_plans.append({
+            'date': day.strftime('%m-%d'),
+            'count': count
+        })
+
+    # 最近7天消息趋势
+    daily_messages = []
+    for i in range(7):
+        day = seven_days_ago + timedelta(days=i)
+        day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1)
+        count = Message.objects.filter(created_at__gte=day_start, created_at__lt=day_end).count()
+        daily_messages.append({
+            'date': day.strftime('%m-%d'),
+            'count': count
+        })
+
+    return Response({
+        'plans': plan_stats,
+        'ai_recommended': ai_recommended,
+        'doctor_created': doctor_created,
+        'executions': execution_stats,
+        'conversations': conversation_stats,
+        'messages': message_stats,
+        'templates': template_stats,
+        'daily_plans': daily_plans,
+        'daily_messages': daily_messages
+    })

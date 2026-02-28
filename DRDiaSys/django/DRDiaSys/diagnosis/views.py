@@ -535,3 +535,80 @@ def add_case_event(request, case_id):
     serializer.is_valid(raise_exception=True)
     event = serializer.save(case=case, created_by=request.user)
     return Response(CaseEventSerializer(event).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def diagnosis_statistics(request):
+    """获取诊断相关统计数据"""
+    from django.db.models import Count, Q
+    from django.utils import timezone
+    from datetime import timedelta
+
+    # 诊断任务统计
+    task_stats = DiagnosisTask.objects.aggregate(
+        total=Count('id'),
+        pending=Count('id', filter=Q(status='pending')),
+        processing=Count('id', filter=Q(status='processing')),
+        completed=Count('id', filter=Q(status='completed')),
+        failed=Count('id', filter=Q(status='failed'))
+    )
+
+    # 诊断报告统计
+    report_stats = DiagnosisReport.objects.aggregate(
+        total=Count('id'),
+        draft=Count('id', filter=Q(status='draft')),
+        confirmed=Count('id', filter=Q(status='confirmed')),
+        archived=Count('id', filter=Q(status='archived'))
+    )
+
+    # 病例统计
+    case_stats = CaseRecord.objects.aggregate(
+        total=Count('id'),
+        active=Count('id', filter=Q(status='active')),
+        closed=Count('id', filter=Q(status='closed'))
+    )
+
+    # 病灶类型统计
+    lesion_stats = {}
+    for task in DiagnosisTask.objects.filter(lesion_statistics__isnull=False).exclude(lesion_statistics={}):
+        task_lesions = task.lesion_statistics or {}
+        for lesion_type, stats in task_lesions.items():
+            if lesion_type not in lesion_stats:
+                lesion_stats[lesion_type] = {'count': 0, 'total_pixels': 0}
+            lesion_stats[lesion_type]['count'] += 1
+            lesion_stats[lesion_type]['total_pixels'] += stats.get('pixel_count', 0)
+
+    # 最近7天诊断趋势
+    seven_days_ago = timezone.now() - timedelta(days=7)
+    daily_tasks = []
+    for i in range(7):
+        day = seven_days_ago + timedelta(days=i)
+        day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1)
+        count = DiagnosisTask.objects.filter(created_at__gte=day_start, created_at__lt=day_end).count()
+        daily_tasks.append({
+            'date': day.strftime('%m-%d'),
+            'count': count
+        })
+
+    # 最近7天报告趋势
+    daily_reports = []
+    for i in range(7):
+        day = seven_days_ago + timedelta(days=i)
+        day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1)
+        count = DiagnosisReport.objects.filter(created_at__gte=day_start, created_at__lt=day_end).count()
+        daily_reports.append({
+            'date': day.strftime('%m-%d'),
+            'count': count
+        })
+
+    return Response({
+        'tasks': task_stats,
+        'reports': report_stats,
+        'cases': case_stats,
+        'lesion_types': lesion_stats,
+        'daily_tasks': daily_tasks,
+        'daily_reports': daily_reports
+    })

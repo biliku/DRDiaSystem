@@ -7,7 +7,7 @@ urlpatterns = [
     path('tasks/create/', views.create_diagnosis_task, name='create_diagnosis_task'),
     path('tasks/<int:task_id>/', views.diagnosis_task_detail, name='diagnosis_task_detail'),
     path('tasks/<int:task_id>/result-image/', views.get_result_image, name='get_result_image'),
-    
+
     # 诊断报告
     path('reports/', views.diagnosis_report_list, name='diagnosis_report_list'),
     path('reports/<int:report_id>/', views.diagnosis_report_detail, name='diagnosis_report_detail'),
@@ -19,5 +19,8 @@ urlpatterns = [
     path('cases/', views.case_records, name='case_records'),
     path('cases/<int:case_id>/', views.case_record_detail, name='case_record_detail'),
     path('cases/<int:case_id>/events/', views.add_case_event, name='add_case_event'),
+
+    # 统计
+    path('statistics/', views.diagnosis_statistics, name='diagnosis_statistics'),
 ]
 

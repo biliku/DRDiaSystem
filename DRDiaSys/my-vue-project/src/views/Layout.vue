@@ -94,7 +94,8 @@ import {
   ChatDotRound,
   Notebook,
   Promotion,
-  UserFilled
+  UserFilled,
+  DataAnalysis
 } from '@element-plus/icons-vue'
 
 export default {
@@ -113,7 +114,8 @@ export default {
     ChatDotRound,
     Notebook,
     Promotion,
-    UserFilled
+    UserFilled,
+    DataAnalysis
   },
   data() {
     return {
@@ -127,30 +129,53 @@ export default {
     activeMenu() {
       const path = this.$route.path
       if (path === '/') {
-        return '/dashboard'
+        return '/image-processing'
       }
       // 如果是子菜单路径，返回子菜单路径用于高亮
       return path
     },
     currentRoute() {
-      const routeMap = {
-        '/dashboard': '首页',
-        '/image-processing': '图像管理与预处理',
-        '/disease-detection': '病变检测',
-        '/user-management': '用户管理',
-        // 用户角色路由
-        '/personal-info': '个人信息录入',
-        '/condition-info': '病情信息录入',
-        '/eye-image-view': '眼部影像查看',
-        '/report-view': '报告复核',
-        '/doctor-patient-chat': '医患交流',
-        // 医生角色路由
-        '/medical-record': '病历管理',
-        '/treatment-plan': '方案推荐',
-        // 患者角色路由
-        '/patient-treatment-plan': '我的治疗方案'
+      // 基础路由映射
+      const baseRouteMap = {
+        '/image-processing': '数据集上传',
+        '/data-statistics': '数据统计',
+        '/ai-model-management': 'AI模型管理',
+        '/user-management': '用户管理'
       }
-      return routeMap[this.$route.path] || '';
+
+      // 根据用户角色返回不同的路由名称
+      const roleRouteMap = {
+        patient: {
+          '/personal-info': '个人信息录入',
+          '/condition-info': '病情信息录入',
+          '/eye-image-view': '眼部影像查看',
+          '/report-view': '报告复核',
+          '/doctor-patient-chat': '医患交流',
+          '/patient-treatment-plan': '我的治疗方案'
+        },
+        doctor: {
+          '/report-view': '报告复核',
+          '/medical-record': '病历管理',
+          '/treatment-plan': '方案推荐',
+          '/doctor-patient-chat': '医患交流'
+        },
+        admin: {
+          '/report-view': '诊断报告'
+        }
+      }
+
+      // 先从基础映射中查找
+      if (baseRouteMap[this.$route.path]) {
+        return baseRouteMap[this.$route.path]
+      }
+
+      // 再从角色映射中查找
+      const role = this.userRole || 'admin'
+      if (roleRouteMap[role] && roleRouteMap[role][this.$route.path]) {
+        return roleRouteMap[role][this.$route.path]
+      }
+
+      return '';
     },
     // 根据角色过滤菜单项
     menuItems() {
@@ -181,10 +206,25 @@ export default {
 
       // 管理员（admin）菜单
       const adminMenus = [
-        { path: '/dashboard', icon: 'DataLine', label: '首页' },
-        { path: '/image-processing', icon: 'Picture', label: '图像管理与预处理' },
-        { path: '/disease-detection', icon: 'Search', label: '病变检测' },
-        { path: '/report-view', icon: 'Files', label: 'AI诊断报告' },
+        {
+          title: 'data-upload',
+          label: '数据集上传',
+          icon: 'Picture',
+          children: [
+            { path: '/image-processing', label: '数据集管理' }
+          ]
+        },
+        {
+          title: 'data-management',
+          label: '数据管理',
+          icon: 'Files',
+          children: [
+            { path: '/report-view', label: '诊断报告' },
+            { path: '/clinical-image', label: '临床影像' }
+          ]
+        },
+        { path: '/data-statistics', icon: 'DataAnalysis', label: '数据统计' },
+        { path: '/ai-model-management', icon: 'Search', label: 'AI模型管理' },
         { path: '/user-management', icon: 'UserFilled', label: '用户管理' }
       ]
 
