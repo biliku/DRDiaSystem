@@ -51,6 +51,9 @@ class DiagnosisTask(models.Model):
     # 诊断结果数据（JSON格式存储详细结果）
     lesion_statistics = models.JSONField(default=dict, blank=True, verbose_name='病灶统计信息')
     
+    # DR分级结果
+    dr_grade_result = models.JSONField(default=dict, blank=True, verbose_name='DR分级结果')
+    
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
     completed_at = models.DateTimeField(blank=True, null=True, verbose_name='完成时间')
@@ -99,6 +102,9 @@ class DiagnosisReport(models.Model):
     # AI诊断结果摘要
     ai_summary = models.TextField(blank=True, null=True, verbose_name='AI诊断摘要')
     lesion_summary = models.JSONField(default=dict, blank=True, verbose_name='病灶摘要')
+    
+    # DR分级结果
+    dr_grade_result = models.JSONField(default=dict, blank=True, verbose_name='DR分级结果')
     
     # 医生复核信息
     reviewed_by = models.ForeignKey(

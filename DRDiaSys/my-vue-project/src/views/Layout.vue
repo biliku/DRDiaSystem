@@ -146,22 +146,22 @@ export default {
       // 根据用户角色返回不同的路由名称
       const roleRouteMap = {
         patient: {
-          '/personal-info': '个人信息录入',
-          '/condition-info': '病情信息录入',
-          '/eye-image-view': '眼部影像查看',
-          '/report-view': '报告复核',
-          '/doctor-patient-chat': '医患交流',
+        '/personal-info': '个人信息录入',
+        '/condition-info': '病情信息录入',
+        '/eye-image-view': '眼部影像查看',
+        '/report-view': '报告复核',
+        '/doctor-patient-chat': '医患交流',
           '/patient-treatment-plan': '我的治疗方案'
         },
         doctor: {
           '/report-view': '报告复核',
-          '/medical-record': '病历管理',
-          '/treatment-plan': '方案推荐',
+        '/medical-record': '病历管理',
+        '/treatment-plan': '方案推荐',
           '/doctor-patient-chat': '医患交流'
         },
         admin: {
           '/report-view': '诊断报告'
-        }
+      }
       }
 
       // 先从基础映射中查找

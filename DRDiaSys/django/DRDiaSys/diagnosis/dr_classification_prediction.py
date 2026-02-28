@@ -26,7 +26,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 CLASS_NAMES = ['无病变', '轻度', '中度', '重度', '增殖性']
 
 # 模型权重路径（请根据实际路径修改）
-MODEL_PATH = r"F:\DRDiaSys\best_resnet_aptos_improved.pth"
+MODEL_PATH = r"F:\DRDiaSys\best_resnet_aptos_enhanced.pth"
 
 
 # ==================== 模型定义 ====================

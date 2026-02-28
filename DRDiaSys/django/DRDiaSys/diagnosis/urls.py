@@ -22,5 +22,15 @@ urlpatterns = [
 
     # 统计
     path('statistics/', views.diagnosis_statistics, name='diagnosis_statistics'),
+
+    # AI模型管理
+    path('ai-models/', views.ai_models, name='ai_models'),
+    path('ai-models/<int:model_id>/', views.ai_model_detail, name='ai_model_detail'),
+    path('ai-models/<int:model_id>/activate/', views.activate_model, name='activate_model'),
+    path('ai-models/<int:model_id>/deactivate/', views.deactivate_model, name='deactivate_model'),
+    path('ai-models/<int:model_id>/set-default/', views.set_default_model, name='set_default_model'),
+    path('ai-models/<int:model_id>/performance/', views.model_performance_logs, name='model_performance_logs'),
+    path('ai-models/<int:model_id>/deployment-history/', views.model_deployment_history, name='model_deployment_history'),
+    path('ai-models/statistics/', views.model_statistics, name='model_statistics'),
 ]
 

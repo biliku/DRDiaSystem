@@ -195,10 +195,90 @@ class DiagnosisReportGenerator:
             elements.append(summary_para)
             elements.append(Spacer(1, 0.3*cm))
         
+        # DR分级结果（放在最前面）
+        dr_grade = self.diagnosis_task.dr_grade_result or {}
+        if dr_grade:
+            # 添加分级标题
+            dr_grade_title = Paragraph("DR分级结果", self.styles['subtitle'])
+            elements.append(dr_grade_title)
+            
+            # 分级信息表格
+            predicted_class = dr_grade.get('predicted_class', -1)
+            class_name = dr_grade.get('class_name', '未知')
+            confidence = dr_grade.get('confidence', 0)
+            all_probs = dr_grade.get('all_probabilities', {})
+            
+            # 准备概率数据（按概率从高到低排序）
+            sorted_probs = sorted(all_probs.items(), key=lambda x: x[1], reverse=True)
+            prob_rows = []
+            for name, prob in sorted_probs:
+                prob_rows.append([name, f"{prob*100:.2f}%"])
+            
+            # 主分级结果
+            grade_data = [
+                ['分级结果', class_name],
+                ['置信度', f"{confidence*100:.2f}%"]
+            ]
+            grade_table = Table(grade_data, colWidths=[4*cm, 8*cm])
+            grade_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f5f5f5')),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), self.chinese_font),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ]))
+            elements.append(grade_table)
+            elements.append(Spacer(1, 0.15*cm))
+            
+            # 各类别概率表格
+            if prob_rows:
+                prob_table_data = [['分级类别', '概率']] + prob_rows
+                prob_table = Table(prob_table_data, colWidths=[4*cm, 3*cm])
+                prob_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#388e3c')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, -1), self.chinese_font),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                    ('TOPPADDING', (0, 0), (-1, 0), 6),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                    ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                    ('FONTNAME', (0, 1), (-1, -1), self.chinese_font),
+                    ('FONTSIZE', (0, 1), (-1, -1), 9),
+                    ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+                    ('TOPPADDING', (0, 1), (-1, -1), 4),
+                    ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f5f5f5')]),
+                ]))
+                elements.append(prob_table)
+                elements.append(Spacer(1, 0.2*cm))
+            
+            # 分级描述
+            grade_desc = f"AI 辅助诊断提示：根据眼底图像分析，该患者糖尿病视网膜病变分级为【{class_name}】，置信度为{confidence*100:.1f}%。"
+            elements.append(Paragraph(grade_desc, self.styles['normal']))
+            elements.append(Spacer(1, 0.2*cm))
+        
+        # 病变分割图
+        if self.diagnosis_task.result_image_path and os.path.exists(self.diagnosis_task.result_image_path):
+            try:
+                img = Image(self.diagnosis_task.result_image_path, width=14*cm, height=4.2*cm)
+                img_caption = Paragraph("<b>图像参考（原图 | 分割 | 叠加）</b>", self.styles['normal'])
+                elements.append(img_caption)
+                elements.append(Spacer(1, 0.15*cm))
+                elements.append(img)
+                elements.append(Spacer(1, 0.3*cm))
+            except Exception as e:
+                print(f"无法添加结果图像: {e}")
+        
         # 病灶统计表格 + 描述
         lesion_stats = self.diagnosis_task.lesion_statistics or {}
         if lesion_stats:
-            table_data = [['病灶类型', '占比(%)', '像素数量']]
+            table_data = [['病灶类型', '占比(%)']]
             detail_rows = []
             for class_id, stat in lesion_stats.items():
                 # 跳过背景 (class_id == 0)
@@ -209,19 +289,17 @@ class DiagnosisReportGenerator:
                     continue
                 detail_rows.append({
                     'name': stat.get('name', ''),
-                    'percentage': stat.get('percentage', 0),
-                    'pixels': stat.get('pixel_count', 0)
+                    'percentage': stat.get('percentage', 0)
                 })
             # 按占比从高到低排序，显示所有检测到的病灶
             detail_rows.sort(key=lambda x: x['percentage'], reverse=True)
             for row in detail_rows:
                 table_data.append([
                     row['name'],
-                    f"{row['percentage']:.2f}",
-                    f"{row['pixels']:,}"
+                    f"{row['percentage']:.2f}"
                 ])
             
-            lesion_table = Table(table_data, colWidths=[6*cm, 3*cm, 4*cm])
+            lesion_table = Table(table_data, colWidths=[8*cm, 4*cm])
             lesion_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1976d2')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -257,18 +335,6 @@ class DiagnosisReportGenerator:
             no_lesion_text = "AI 分割结果提示：本次图像中未检测到明显病灶。"
             elements.append(Paragraph(no_lesion_text, self.styles['normal']))
             elements.append(Spacer(1, 0.2*cm))
-        
-        # 结果图像
-        if self.diagnosis_task.result_image_path and os.path.exists(self.diagnosis_task.result_image_path):
-            try:
-                img = Image(self.diagnosis_task.result_image_path, width=14*cm, height=4.2*cm)
-                img_caption = Paragraph("<b>图像参考（原图 | 分割 | 叠加）</b>", self.styles['normal'])
-                elements.append(img_caption)
-                elements.append(Spacer(1, 0.15*cm))
-                elements.append(img)
-                elements.append(Spacer(1, 0.3*cm))
-            except Exception as e:
-                print(f"无法添加结果图像: {e}")
         
         return elements
     

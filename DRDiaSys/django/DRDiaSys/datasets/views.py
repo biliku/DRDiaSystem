@@ -380,10 +380,10 @@ def patient_images(request):
         from diagnosis.models import DiagnosisTask
         import threading
         
-        # 创建诊断任务
+        # 创建诊断任务（默认执行病灶分割+DR分级）
         diagnosis_task = DiagnosisTask.objects.create(
             patient_image=patient_image,
-            task_type='lesion_segmentation',
+            task_type='both',
             status='pending'
         )
         

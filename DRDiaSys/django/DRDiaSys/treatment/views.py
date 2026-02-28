@@ -710,7 +710,7 @@ def message_template_detail(request, template_id):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
     elif request.method == 'DELETE':
         template.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
